@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.npm-cache/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+preview.log
+preview-error.log
+dev-server.log
+dev-server-error.log
+*.zip

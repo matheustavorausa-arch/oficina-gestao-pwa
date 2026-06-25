@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17231f"/>
+      <stop offset="1" stop-color="#2e4a40"/>
+    </linearGradient>
+    <linearGradient id="shirt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f6f55"/>
+      <stop offset="1" stop-color="#0f3c2f"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="190" r="84" fill="#d4a27a"/>
+  <path d="M174 178c9-67 43-100 96-100 55 0 88 35 94 100-44-23-97-25-190 0Z" fill="#151a18"/>
+  <path d="M150 392c13-78 56-118 106-118s93 40 106 118v34H150v-34Z" fill="url(#shirt)"/>
+  <path d="M212 283l44 65 44-65c-28 18-60 18-88 0Z" fill="#f4f0e6"/>
+  <path d="M184 111h144c18 0 32 14 32 32v16H152v-16c0-18 14-32 32-32Z" fill="#ec1c24"/>
+  <path d="M147 153h218c12 0 22 10 22 22v8H125v-8c0-12 10-22 22-22Z" fill="#b9151c"/>
+  <path d="M331 323l50-50 24 24-50 50 18 18-33 15-24-24 15-33Z" fill="#f8c84b"/>
+  <circle cx="226" cy="191" r="8" fill="#1a1a1a"/>
+  <circle cx="286" cy="191" r="8" fill="#1a1a1a"/>
+  <path d="M225 229c21 17 43 17 64 0" fill="none" stroke="#7a4631" stroke-width="10" stroke-linecap="round"/>
+  <text x="256" y="466" text-anchor="middle" fill="#ffffff88" font-family="Arial, sans-serif" font-size="30" font-weight="900">MECHANIC</text>
+</svg>

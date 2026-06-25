@@ -1,0 +1,26 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111916"/><stop offset=".55" stop-color="#1e3029"/><stop offset="1" stop-color="#0c1210"/>
+    </linearGradient>
+    <radialGradient id="floor" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff22"/><stop offset="1" stop-color="#ffffff00"/></radialGradient>
+    <linearGradient id="paint" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#f4f5f2"/><stop offset="1" stop-color="#050706"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffffa8"/><stop offset="1" stop-color="#7aa7b844"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="28" stdDeviation="22" flood-color="#000" flood-opacity=".45"/></filter>
+  </defs>
+  <rect width="1200" height="720" rx="54" fill="url(#bg)"/>
+  <circle cx="1015" cy="118" r="225" fill="#ec1c24" opacity=".10"/>
+  <circle cx="180" cy="615" r="250" fill="#3bd39d" opacity=".08"/>
+  <ellipse cx="600" cy="565" rx="420" ry="80" fill="url(#floor)"/>
+  <g transform="translate(240 145)" fill="url(#paint)" filter="url(#shadow)"><path d="M85 303h103l58-67h215l72 67h74c27 0 49 22 49 49v13H64v-18c0-25 8-44 21-44Z"/><path d="M264 238h176l55 65H207l57-65Z" fill="url(#glass)"/><path d="M412 92 374 180h46l-34 86 96-125h-52l42-49h-60Z" fill="#f6ff00" opacity=".88"/><path d="M151 309h399" stroke="#ffffff4a" stroke-width="8" stroke-linecap="round"/></g>
+  <g transform="translate(240 145)">
+    <circle cx="230" cy="376" r="61" fill="#101614" stroke="#f1f5f1" stroke-opacity=".45" stroke-width="13"/>
+    <circle cx="542" cy="376" r="61" fill="#101614" stroke="#f1f5f1" stroke-opacity=".45" stroke-width="13"/>
+    <circle cx="230" cy="376" r="18" fill="#edf1ee"/><circle cx="542" cy="376" r="18" fill="#edf1ee"/>
+  </g>
+  <rect x="74" y="72" width="245" height="48" rx="24" fill="#ec1c24" opacity=".95"/>
+  <text x="96" y="104" fill="#fff" font-family="Arial, sans-serif" font-size="23" font-weight="900">TESLA</text>
+  <text x="72" y="178" fill="#fff" font-family="Arial, sans-serif" font-size="72" font-weight="900" letter-spacing="-3">MODEL 3</text>
+  <text x="76" y="220" fill="#aeb9b4" font-family="Arial, sans-serif" font-size="20" font-weight="700">3D STYLE · STANDARD BACKGROUND · EV</text>
+  <text x="1024" y="654" fill="#ffffff22" text-anchor="end" font-family="Arial, sans-serif" font-size="120" font-weight="900">TORQUE</text>
+</svg>
