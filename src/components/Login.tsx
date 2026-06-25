@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { ArrowRight, Eye, Gauge, Loader2, Mail, Wrench } from 'lucide-react'
+import { ArrowRight, Eye, KeyRound, Loader2, LockKeyhole, Mail, ShieldCheck, UserRound, Wrench } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { Role, UserProfile } from '../types'
 
@@ -29,6 +29,7 @@ export function Login({ onLogin }: Props) {
   const [rememberLogin, setRememberLogin] = useState(() => Boolean(localStorage.getItem(rememberedLoginKey)))
   const [recentLogins, setRecentLogins] = useState<string[]>(getRecentLogins)
   const [showLoginHistory, setShowLoginHistory] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   function saveLoginPreference(loginEmail = email) {
     const normalized = loginEmail.trim().toLowerCase()
@@ -86,19 +87,44 @@ export function Login({ onLogin }: Props) {
   }
 
   function changeMode(next: Mode) { setMode(next); setMessage('') }
-  return <main className="login-shell">
-    <section className="login-brand"><div className="brand jas-brand"><span className="brand-mark"><Wrench /></span><span><b>JAS</b> MOTORS</span></div><div className="brand-copy"><span className="eyebrow">AUTO REPAIR & SERVICE</span><h1>Controle total.<br /><em>Mais lucro.</em></h1><p>Ordens, clientes, equipe e resultados em um só lugar — no computador ou no celular.</p></div><div className="brand-metrics"><div><strong>+32%</strong><span>produtividade</span></div><div><strong>4.9</strong><span>satisfação</span></div><div><strong>24/7</strong><span>acesso</span></div></div><Gauge className="brand-gauge" /></section>
-    <section className="login-panel"><form className="login-card" onSubmit={submit}>
-      <div className="mobile-brand jas-brand"><span className="brand-mark"><Wrench /></span> <span><b>JAS</b> MOTORS</span></div>
-      <span className="eyebrow">{mode === 'register' ? 'COMECE AGORA' : 'BEM-VINDO DE VOLTA'}</span><h2>{mode === 'forgot' ? 'Recuperar acesso' : mode === 'register' ? 'Cadastre sua oficina' : 'Entre na sua oficina'}</h2><p>{mode === 'forgot' ? 'Informe seu e-mail para receber as instruções.' : mode === 'register' ? 'Crie o primeiro acesso do proprietário.' : 'Use seus dados para acessar o painel.'}</p>
-      {mode === 'register' && <><label>Seu nome<div className="input-wrap"><input value={ownerName} onChange={e => setOwnerName(e.target.value)} required /></div></label><label>Nome da oficina<div className="input-wrap"><Wrench /><input value={workshopName} onChange={e => setWorkshopName(e.target.value)} required /></div></label></>}
-      <label className="email-field">E-mail<div className="input-wrap"><Mail /><input type="email" value={email} autoComplete="email" onDoubleClick={() => setShowLoginHistory(true)} onFocus={() => setShowLoginHistory(false)} onChange={e => setEmail(e.target.value)} required /></div>{showLoginHistory && recentLogins.length > 0 && <div className="login-history">{recentLogins.map(item => <button type="button" key={item} onClick={() => { setEmail(item); setShowLoginHistory(false) }}>{item}</button>)}</div>}</label>
-      {mode !== 'forgot' && <label>Senha<div className="input-wrap"><input type="password" minLength={6} value={password} autoComplete="current-password" onChange={e => setPassword(e.target.value)} required /><Eye /></div></label>}
-      {mode !== 'forgot' && <label className="remember-login"><input type="checkbox" checked={rememberLogin} onChange={e => { setRememberLogin(e.target.checked); if (!e.target.checked) localStorage.removeItem(rememberedLoginKey) }} /><span>Lembrar deste login</span></label>}
-      {message && <div className="form-message">{message}</div>}
-      <button className="primary-btn" disabled={loading}>{loading ? <Loader2 className="spin" /> : <>{mode === 'forgot' ? 'Enviar instruções' : mode === 'register' ? 'Criar minha oficina' : 'Entrar na oficina'} <ArrowRight /></>}</button>
-      <div className="login-links"><button type="button" className="link-btn" onClick={() => changeMode(mode === 'forgot' ? 'login' : 'forgot')}>{mode === 'forgot' ? 'Voltar ao login' : 'Esqueci minha senha'}</button><button type="button" className="link-btn" onClick={() => changeMode(mode === 'register' ? 'login' : 'register')}>{mode === 'register' ? 'Já tenho conta' : 'Cadastrar oficina'}</button></div>
-      {!isSupabaseConfigured && <div className="demo-note"><strong>Modo demonstração</strong><span>Escolha a experiência que deseja visualizar.</span><div className="role-picker">{([['owner','Dono'],['mechanic','Mecânico'],['customer','Cliente']] as const).map(([role,label]) => <button type="button" className={demoRole === role ? 'active' : ''} onClick={() => setDemoRole(role)} key={role}>{label}</button>)}</div></div>}
-    </form></section>
+
+  const submitText = mode === 'forgot' ? 'Enviar instruções' : mode === 'register' ? 'Criar minha oficina' : 'Entrar na oficina'
+
+  return <main className="login-shell premium-login-shell">
+    <section className="login-panel premium-login-panel">
+      <form className="login-card premium-login-card" onSubmit={submit}>
+        <div className="premium-logo" aria-label="JAS Motors">
+          <div className="premium-car-line" />
+          <strong>JAS</strong>
+          <span>MOTORS</span>
+          <small>AUTO REPAIR & SERVICE</small>
+          <i><Wrench /></i>
+        </div>
+
+        <span className="eyebrow login-eyebrow">{mode === 'register' ? 'COMECE AGORA' : 'BEM-VINDO DE VOLTA'}</span>
+        <h2>{mode === 'forgot' ? 'Recuperar acesso' : mode === 'register' ? 'Cadastre sua oficina' : 'Entre na sua oficina'}</h2>
+        <p>{mode === 'forgot' ? 'Informe seu e-mail para receber as instruções.' : mode === 'register' ? 'Crie o primeiro acesso do proprietário.' : 'Use seus dados para acessar o painel.'}</p>
+
+        {mode === 'register' && <>
+          <label>Seu nome<div className="input-wrap premium-input"><UserRound /><input value={ownerName} onChange={e => setOwnerName(e.target.value)} required /></div></label>
+          <label>Nome da oficina<div className="input-wrap premium-input"><Wrench /><input value={workshopName} onChange={e => setWorkshopName(e.target.value)} required /></div></label>
+        </>}
+
+        <label className="email-field">E-mail<div className="input-wrap premium-input"><Mail /><input type="email" placeholder="seu@email.com" value={email} autoComplete="email" onDoubleClick={() => setShowLoginHistory(true)} onFocus={() => setShowLoginHistory(false)} onChange={e => setEmail(e.target.value)} required /></div>{showLoginHistory && recentLogins.length > 0 && <div className="login-history">{recentLogins.map(item => <button type="button" key={item} onClick={() => { setEmail(item); setShowLoginHistory(false) }}>{item}</button>)}</div>}</label>
+
+        {mode !== 'forgot' && <label>Senha<div className="input-wrap premium-input"><LockKeyhole /><input type={showPassword ? 'text' : 'password'} placeholder="Sua senha" minLength={6} value={password} autoComplete="current-password" onChange={e => setPassword(e.target.value)} required /><button type="button" className="password-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}><Eye /></button></div></label>}
+        {mode !== 'forgot' && <label className="remember-login premium-remember"><input type="checkbox" checked={rememberLogin} onChange={e => { setRememberLogin(e.target.checked); if (!e.target.checked) localStorage.removeItem(rememberedLoginKey) }} /><span>Lembrar deste login</span></label>}
+
+        {message && <div className="form-message">{message}</div>}
+
+        <button className="primary-btn premium-login-submit" disabled={loading}>{loading ? <Loader2 className="spin" /> : <>{submitText} <ArrowRight /></>}</button>
+
+        <div className="login-links premium-login-links"><button type="button" className="link-btn" onClick={() => changeMode(mode === 'forgot' ? 'login' : 'forgot')}>{mode === 'forgot' ? 'Voltar ao login' : 'Esqueci minha senha'}</button><button type="button" className="link-btn" onClick={() => changeMode(mode === 'register' ? 'login' : 'register')}>{mode === 'register' ? 'Já tenho conta' : 'Cadastrar oficina'}</button></div>
+
+        {mode !== 'forgot' && <div className="premium-role-area"><span>Acessar como</span><div className="role-picker premium-role-picker">{([['owner','Dono', ShieldCheck],['mechanic','Mecânico', KeyRound],['customer','Cliente', UserRound]] as const).map(([role,label,Icon]) => <button type="button" className={demoRole === role ? 'active' : ''} onClick={() => setDemoRole(role)} key={role}><Icon />{label}</button>)}</div></div>}
+        {!isSupabaseConfigured && <div className="demo-note premium-demo-note"><strong>Modo demonstração</strong><span>O seletor acima define qual experiência será aberta.</span></div>}
+        <footer className="premium-login-footer"><ShieldCheck />Seu negócio. Sua oficina. Seu controle.<span>JAS MOTORS SYSTEM</span></footer>
+      </form>
+    </section>
   </main>
 }
