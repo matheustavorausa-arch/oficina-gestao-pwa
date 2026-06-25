@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { ArrowRight, Eye, KeyRound, Loader2, LockKeyhole, Mail, ShieldCheck, UserRound, Wrench } from 'lucide-react'
+import { ArrowRight, ClipboardCheck, Eye, Loader2, Mail, UserRound, Wrench } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { Role, UserProfile } from '../types'
 
@@ -112,7 +112,7 @@ export function Login({ onLogin }: Props) {
 
         <label className="email-field">E-mail<div className="input-wrap premium-input"><Mail /><input type="email" placeholder="seu@email.com" value={email} autoComplete="email" onDoubleClick={() => setShowLoginHistory(true)} onFocus={() => setShowLoginHistory(false)} onChange={e => setEmail(e.target.value)} required /></div>{showLoginHistory && recentLogins.length > 0 && <div className="login-history">{recentLogins.map(item => <button type="button" key={item} onClick={() => { setEmail(item); setShowLoginHistory(false) }}>{item}</button>)}</div>}</label>
 
-        {mode !== 'forgot' && <label>Senha<div className="input-wrap premium-input"><LockKeyhole /><input type={showPassword ? 'text' : 'password'} placeholder="Sua senha" minLength={6} value={password} autoComplete="current-password" onChange={e => setPassword(e.target.value)} required /><button type="button" className="password-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}><Eye /></button></div></label>}
+        {mode !== 'forgot' && <label>Senha<div className="input-wrap premium-input"><ClipboardCheck /><input type={showPassword ? 'text' : 'password'} placeholder="Sua senha" minLength={6} value={password} autoComplete="current-password" onChange={e => setPassword(e.target.value)} required /><button type="button" className="password-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}><Eye /></button></div></label>}
         {mode !== 'forgot' && <label className="remember-login premium-remember"><input type="checkbox" checked={rememberLogin} onChange={e => { setRememberLogin(e.target.checked); if (!e.target.checked) localStorage.removeItem(rememberedLoginKey) }} /><span>Lembrar deste login</span></label>}
 
         {message && <div className="form-message">{message}</div>}
@@ -121,9 +121,9 @@ export function Login({ onLogin }: Props) {
 
         <div className="login-links premium-login-links"><button type="button" className="link-btn" onClick={() => changeMode(mode === 'forgot' ? 'login' : 'forgot')}>{mode === 'forgot' ? 'Voltar ao login' : 'Esqueci minha senha'}</button><button type="button" className="link-btn" onClick={() => changeMode(mode === 'register' ? 'login' : 'register')}>{mode === 'register' ? 'Já tenho conta' : 'Cadastrar oficina'}</button></div>
 
-        {mode !== 'forgot' && <div className="premium-role-area"><span>Acessar como</span><div className="role-picker premium-role-picker">{([['owner','Dono', ShieldCheck],['mechanic','Mecânico', KeyRound],['customer','Cliente', UserRound]] as const).map(([role,label,Icon]) => <button type="button" className={demoRole === role ? 'active' : ''} onClick={() => setDemoRole(role)} key={role}><Icon />{label}</button>)}</div></div>}
+        {mode !== 'forgot' && <div className="premium-role-area"><span>Acessar como</span><div className="role-picker premium-role-picker">{([['owner','Dono', ClipboardCheck],['mechanic','Mecânico', Wrench],['customer','Cliente', UserRound]] as const).map(([role,label,Icon]) => <button type="button" className={demoRole === role ? 'active' : ''} onClick={() => setDemoRole(role)} key={role}><Icon />{label}</button>)}</div></div>}
         {!isSupabaseConfigured && <div className="demo-note premium-demo-note"><strong>Modo demonstração</strong><span>O seletor acima define qual experiência será aberta.</span></div>}
-        <footer className="premium-login-footer"><ShieldCheck />Seu negócio. Sua oficina. Seu controle.<span>JAS MOTORS SYSTEM</span></footer>
+        <footer className="premium-login-footer"><ClipboardCheck />Seu negócio. Sua oficina. Seu controle.<span>JAS MOTORS SYSTEM</span></footer>
       </form>
     </section>
   </main>
