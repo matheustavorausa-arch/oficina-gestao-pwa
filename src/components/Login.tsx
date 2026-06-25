@@ -7,6 +7,19 @@ interface Props { onLogin: (profile: UserProfile) => void }
 type Mode = 'login' | 'forgot' | 'register'
 const rememberedLoginKey = 'torque_remembered_login'
 const recentLoginsKey = 'torque_recent_logins'
+const vehicleOptions = [
+  ['Toyota', 'Camry'], ['Toyota', 'Corolla'], ['Toyota', 'RAV4'],
+  ['Honda', 'Civic'], ['Honda', 'Accord'], ['Honda', 'CR-V'],
+  ['Ford', 'F-150'], ['Ford', 'EcoSport'], ['Ford', 'Escape'], ['Ford', 'Explorer'],
+  ['Chevrolet', 'Silverado'], ['Chevrolet', 'Equinox'], ['Chevrolet', 'Malibu'],
+  ['Nissan', 'Altima'], ['Nissan', 'Rogue'], ['Nissan', 'Sentra'],
+  ['Hyundai', 'Elantra'], ['Hyundai', 'Tucson'], ['Hyundai', 'Santa Fe'],
+  ['Kia', 'Telluride'], ['Kia', 'Sportage'], ['Jeep', 'Grand Cherokee'],
+  ['Tesla', 'Model 3'], ['Tesla', 'Model Y'], ['Ram', '1500'],
+  ['Subaru', 'Outback'], ['Subaru', 'Forester'], ['Mazda', 'CX-5'],
+  ['Volkswagen', 'Jetta'], ['BMW', '320i'], ['Mercedes-Benz', 'C-Class'], ['Audi', 'A4'],
+  ['Other', 'Outro modelo'],
+] as const
 
 function getRecentLogins() {
   try {
@@ -21,6 +34,19 @@ export function Login({ onLogin }: Props) {
   const [email, setEmail] = useState(() => localStorage.getItem(rememberedLoginKey) ?? '')
   const [password, setPassword] = useState('')
   const [ownerName, setOwnerName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [vehicleChoice, setVehicleChoice] = useState('Honda|Civic')
+  const [customVehicle, setCustomVehicle] = useState('')
+  const [vehicleYear, setVehicleYear] = useState(String(new Date().getFullYear()))
+  const [vehicleColor, setVehicleColor] = useState('')
+  const [vehiclePlate, setVehiclePlate] = useState('')
+  const [serviceProblem, setServiceProblem] = useState('')
+  const [scheduledAt, setScheduledAt] = useState(() => {
+    const date = new Date()
+    date.setDate(date.getDate() + 1)
+    date.setHours(10, 0, 0, 0)
+    return date.toISOString().slice(0, 16)
+  })
   const [mode, setMode] = useState<Mode>('login')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -53,8 +79,30 @@ export function Login({ onLogin }: Props) {
       const { data, error } = await supabase!.auth.signUp({ email, password, options: { data: { full_name: ownerName, role: 'customer' } } })
       if (error) { setMessage(error.message); setLoading(false); return }
       if (!data.session) { setMessage('Conta criada. Confirme seu e-mail e depois entre como cliente.'); setLoading(false); return }
+      const [selectedMake, selectedModel] = vehicleChoice.split('|')
+      const isOther = selectedMake === 'Other'
+      const otherParts = customVehicle.trim().split(/\s+/)
+      const make = isOther ? otherParts.shift() || 'Vehicle' : selectedMake
+      const model = isOther ? otherParts.join(' ') || 'Outro modelo' : selectedModel
+      const { error: onboardingError } = await supabase!.rpc('create_customer_onboarding', {
+        p_full_name: ownerName,
+        p_phone: phone,
+        p_vehicle_make: make,
+        p_vehicle_model: model,
+        p_vehicle_year: Number(vehicleYear) || null,
+        p_vehicle_color: vehicleColor,
+        p_vehicle_plate: vehiclePlate,
+        p_problem: serviceProblem || 'Cliente solicitou agendamento pelo app.',
+        p_scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : new Date().toISOString(),
+      })
+      if (onboardingError) { setMessage(onboardingError.message); setLoading(false); return }
       saveLoginPreference()
-      onLogin({ userId: data.user!.id, name: ownerName || data.user!.email || 'Cliente', role: 'customer', workshopName: 'JAS Motors' }); return
+      await supabase!.auth.signOut()
+      setMode('login')
+      setPassword('')
+      setMessage('Conta criada com sucesso. Faça login para acompanhar seu agendamento.')
+      setLoading(false)
+      return
     }
     const { data, error } = await supabase!.auth.signInWithPassword({ email, password })
     if (error) { setMessage(error.message); setLoading(false); return }
@@ -93,11 +141,23 @@ export function Login({ onLogin }: Props) {
 
         {mode === 'register' && <>
           <label>Seu nome<div className="input-wrap premium-input"><UserRound /><input value={ownerName} onChange={e => setOwnerName(e.target.value)} required /></div></label>
+          <label>Telefone<div className="input-wrap premium-input"><UserRound /><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="(407) 555-1234" /></div></label>
         </>}
 
         <label className="email-field">E-mail<div className="input-wrap premium-input"><Mail /><input type="email" placeholder="seu@email.com" value={email} autoComplete="email" onDoubleClick={() => setShowLoginHistory(true)} onFocus={() => setShowLoginHistory(false)} onChange={e => setEmail(e.target.value)} required /></div>{showLoginHistory && recentLogins.length > 0 && <div className="login-history">{recentLogins.map(item => <button type="button" key={item} onClick={() => { setEmail(item); setShowLoginHistory(false) }}>{item}</button>)}</div>}</label>
 
         {mode !== 'forgot' && <label>Senha<div className="input-wrap premium-input"><ClipboardCheck /><input type={showPassword ? 'text' : 'password'} placeholder="Sua senha" minLength={6} value={password} autoComplete="current-password" onChange={e => setPassword(e.target.value)} required /><button type="button" className="password-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}><Eye /></button></div></label>}
+        {mode === 'register' && <div className="customer-onboarding-fields">
+          <label>Seu veículo<div className="input-wrap premium-input"><Wrench /><select value={vehicleChoice} onChange={e => setVehicleChoice(e.target.value)}>{vehicleOptions.map(([make, model]) => <option key={`${make}-${model}`} value={`${make}|${model}`}>{make === 'Other' ? 'Outro / não encontrei meu carro' : `${make} ${model}`}</option>)}</select></div></label>
+          {vehicleChoice.startsWith('Other|') && <label>Marca e modelo<div className="input-wrap premium-input"><Wrench /><input value={customVehicle} onChange={e => setCustomVehicle(e.target.value)} placeholder="Ex: Dodge Charger" required /></div></label>}
+          <div className="onboarding-grid">
+            <label>Ano<div className="input-wrap premium-input"><input type="number" min="1980" max="2030" value={vehicleYear} onChange={e => setVehicleYear(e.target.value)} /></div></label>
+            <label>Cor<div className="input-wrap premium-input"><input value={vehicleColor} onChange={e => setVehicleColor(e.target.value)} placeholder="Preto" /></div></label>
+            <label>Placa<div className="input-wrap premium-input"><input value={vehiclePlate} onChange={e => setVehiclePlate(e.target.value.toUpperCase())} placeholder="ABC1234" /></div></label>
+          </div>
+          <label>Problema ou serviço desejado<div className="input-wrap premium-input textarea-input"><textarea value={serviceProblem} onChange={e => setServiceProblem(e.target.value)} placeholder="Ex: barulho ao frear, troca de óleo, luz no painel..." required /></div></label>
+          <label>Data desejada<div className="input-wrap premium-input"><input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} /></div></label>
+        </div>}
         {mode !== 'forgot' && <label className="remember-login premium-remember"><input type="checkbox" checked={rememberLogin} onChange={e => { setRememberLogin(e.target.checked); if (!e.target.checked) localStorage.removeItem(rememberedLoginKey) }} /><span>Lembrar deste login</span></label>}
 
         {message && <div className="form-message">{message}</div>}

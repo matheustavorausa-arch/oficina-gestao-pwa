@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Bell, CalendarDays, Camera, Car, Check, ChevronRight, ClipboardCheck, Clock3, FileText, Gauge, History, Home, LogOut, MessageCircle, Plus, ReceiptText, Send, Settings2, UserRound, Wrench } from 'lucide-react'
 import { demoOrders } from '../demoData'
 import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '../lib/avatars'
+import { fetchServiceOrders } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
-import type { UserProfile } from '../types'
+import type { ServiceOrder, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void }
 
@@ -14,11 +15,13 @@ function RoleHeader({ profile, onLogout, title }: Props & { title: string }) {
 function Toast({ text }: { text: string }) { return text ? <div className="toast"><Check />{text}</div> : null }
 
 export function MechanicDashboard({ profile, onLogout }: Props) {
-  const [selected, setSelected] = useState(demoOrders[0])
+  const [remoteOrders, setRemoteOrders] = useState<ServiceOrder[]>([])
+  const [selected, setSelected] = useState<ServiceOrder>(demoOrders[0])
   const [toast, setToast] = useState('')
   const [status, setStatus] = useState('Em avaliação')
   const [avatarUrl, setAvatarUrl] = useState(defaultMechanicAvatar)
-  const tasks = demoOrders.filter(order => order.status !== 'Finalizado')
+  const sourceOrders = remoteOrders.length ? remoteOrders : demoOrders
+  const tasks = sourceOrders.filter(order => order.status !== 'Finalizado')
   function action(text: string) { setToast(text); setTimeout(() => setToast(''), 2300) }
 
   async function changeOwnAvatar(file?: File) {
@@ -44,6 +47,22 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
     }
     loadAvatar()
   }, [profile.userId])
+
+  useEffect(() => {
+    if (!supabase || !profile.workshopId) return
+    const loadOrders = () => fetchServiceOrders(profile).then(items => {
+      setRemoteOrders(items)
+      if (items.length) setSelected(current => items.find(item => item.id === current.id) ?? items[0])
+    }).catch(() => undefined)
+    loadOrders()
+    const client = supabase
+    const channel = client
+      .channel(`mechanic-orders-${profile.userId}-${profile.workshopId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_orders', filter: `workshop_id=eq.${profile.workshopId}` }, loadOrders)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_assignments', filter: `workshop_id=eq.${profile.workshopId}` }, loadOrders)
+      .subscribe()
+    return () => { client.removeChannel(channel) }
+  }, [profile.userId, profile.workshopId])
 
   return <div className="role-app mechanic-app">
     <RoleHeader profile={profile} onLogout={onLogout} title="Área do mecânico" />
