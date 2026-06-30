@@ -12,9 +12,9 @@ type MetricModal = 'active' | 'approval' | 'appointments' | 'revenue' | null
 
 const statusClass: Record<ServiceStatus, string> = {
   Aguardando: 'gray',
-  'DiagnÃ³stico': 'blue',
-  'OrÃ§amento': 'amber',
-  'Em execuÃ§Ã£o': 'green',
+  'Diagnóstico': 'blue',
+  'Orçamento': 'amber',
+  'Em execução': 'green',
   Finalizado: 'dark',
 }
 
@@ -39,7 +39,7 @@ function OrderModal({ order, onClose }: { order: ServiceOrder; onClose: () => vo
 
 function MetricDetailsModal({ type, orders, appointments, onClose }: { type: Exclude<MetricModal, null>; orders: ServiceOrder[]; appointments: DashboardAppointment[]; onClose: () => void }) {
   const active = orders.filter(order => order.status !== 'Finalizado')
-  const approvals = orders.filter(order => order.status === 'OrÃ§amento')
+  const approvals = orders.filter(order => order.status === 'Orçamento')
   const revenue = orders.reduce((sum, order) => sum + order.total, 0)
   const averageTicket = orders.length ? revenue / orders.length : 0
   const config = {
@@ -95,7 +95,7 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
   const orders = useMemo(() => sourceOrders.filter(order => `${order.code} ${order.customer} ${order.vehicle} ${order.plate}`.toLowerCase().includes(query.toLowerCase())), [query, sourceOrders])
   const activeOrders = orders.filter(order => order.status !== 'Finalizado').length
   const completedOrders = orders.filter(order => order.status === 'Finalizado').length
-  const pendingEstimates = orders.filter(order => order.status === 'OrÃ§amento').length
+  const pendingEstimates = orders.filter(order => order.status === 'Orçamento').length
   const revenue = orders.reduce((sum, order) => sum + order.total, 0)
   const averageTicket = orders.length ? revenue / orders.length : 0
   const nav = [
