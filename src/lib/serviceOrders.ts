@@ -15,15 +15,15 @@ type DbOrder = {
 }
 
 const statusMap: Record<string, ServiceStatus> = {
-  waiting: 'Aguardando',
-  diagnosis: 'Diagnóstico',
-  estimate: 'Orçamento',
-  approved: 'Orçamento',
-  in_progress: 'Em execução',
-  quality_check: 'Em execução',
-  completed: 'Finalizado',
-  delivered: 'Finalizado',
-  cancelled: 'Finalizado',
+  waiting: 'Waiting',
+  diagnosis: 'Diagnosis',
+  estimate: 'Estimate',
+  approved: 'Estimate',
+  in_progress: 'In Progress',
+  quality_check: 'In Progress',
+  completed: 'Completed',
+  delivered: 'Completed',
+  cancelled: 'Completed',
 }
 
 function progressFor(status: string) {
@@ -91,18 +91,18 @@ export async function fetchServiceOrders(profile: UserProfile): Promise<ServiceO
     const vehicle = order.vehicles
     return {
       id: order.id,
-      code: `OS-${String(order.number).padStart(4, '0')}`,
-      customer: order.customers?.full_name ?? 'Cliente',
-      vehicle: vehicle ? `${vehicle.make} ${vehicle.model}${vehicle.year ? ` ${vehicle.year}` : ''}` : 'Veículo',
-      plate: vehicle?.plate ?? 'Sem placa',
+      code: `RO-${String(order.number).padStart(4, '0')}`,
+      customer: order.customers?.full_name ?? 'Customer',
+      vehicle: vehicle ? `${vehicle.make} ${vehicle.model}${vehicle.year ? ` ${vehicle.year}` : ''}` : 'Vehicle',
+      plate: vehicle?.plate ?? 'No plate',
       vehicleImage: vehicle?.vehicle_model_catalog?.image_url ?? undefined,
       vehicleBodyType: vehicle?.vehicle_model_catalog?.body_type ?? undefined,
       service: order.diagnosis || order.complaint,
-      status: statusMap[order.status] ?? 'Aguardando',
-      mechanic: mechanicId ? mechanicById.get(mechanicId) ?? 'Mecânico' : 'Sem responsável',
+      status: statusMap[order.status] ?? 'Waiting',
+      mechanic: mechanicId ? mechanicById.get(mechanicId) ?? 'Mechanic' : 'Unassigned',
       progress: progressFor(order.status),
       total: estimateByOrder.get(order.id) ?? 0,
-      date: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(order.created_at)),
+      date: new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(order.created_at)),
     }
   })
 }

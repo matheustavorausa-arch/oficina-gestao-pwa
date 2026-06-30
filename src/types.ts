@@ -1,5 +1,5 @@
 export type Role = 'owner' | 'mechanic' | 'customer'
-export type ServiceStatus = 'Aguardando' | 'Diagnóstico' | 'Orçamento' | 'Em execução' | 'Finalizado'
+export type ServiceStatus = 'Waiting' | 'Diagnosis' | 'Estimate' | 'In Progress' | 'Completed'
 
 export interface UserProfile {
   userId?: string

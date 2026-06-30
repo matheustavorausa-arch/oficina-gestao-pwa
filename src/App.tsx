@@ -26,7 +26,7 @@ async function resolveSupabaseProfile(): Promise<UserProfile | null> {
 
   const member = members?.[0] as unknown as { workshop_id: string; role: UserProfile['role']; workshops: { name: string } } | undefined
   const workshopId = member?.workshop_id ?? ownProfile?.workshop_id
-  let workshopName = member?.workshops?.name ?? 'Minha oficina'
+  let workshopName = member?.workshops?.name ?? 'My Workshop'
 
   if (workshopId && !member?.workshops?.name) {
     const { data: workshop } = await supabase
@@ -40,7 +40,7 @@ async function resolveSupabaseProfile(): Promise<UserProfile | null> {
   return {
     userId: user.id,
     workshopId,
-    name: ownProfile?.full_name ?? user.email ?? 'Usuário',
+    name: ownProfile?.full_name ?? user.email ?? 'User',
     role: member?.role ?? 'customer',
     workshopName,
   }

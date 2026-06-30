@@ -11,7 +11,7 @@ export async function resolveAvatarUrl(path?: string | null) {
 }
 
 export async function uploadProfileAvatar(userId: string, file: File) {
-  if (!supabase) throw new Error('Supabase não configurado.')
+  if (!supabase) throw new Error('Supabase is not configured.')
   const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const path = `profiles/${userId}/avatar-${Date.now()}.${extension}`
   const { error: uploadError } = await supabase.storage.from('service-photos').upload(path, file, {

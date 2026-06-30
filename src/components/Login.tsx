@@ -50,14 +50,14 @@ export function Login({ onLogin }: Props) {
       saveLoginPreference()
       setTimeout(() => {
         setLoading(false)
-        onLogin({ name: ownerName || 'Cliente Demo', role: 'customer', workshopName: 'JAS Motors' })
+        onLogin({ name: ownerName || 'Demo Customer', role: 'customer', workshopName: 'JAS Motors' })
       }, 450)
       return
     }
 
     if (mode === 'forgot') {
       const { error } = await supabase!.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
-      setMessage(error ? error.message : 'Enviamos as instruções para o seu e-mail.')
+      setMessage(error ? error.message : 'Password reset instructions were sent to your email.')
       setLoading(false)
       return
     }
@@ -95,7 +95,7 @@ export function Login({ onLogin }: Props) {
       setPassword('')
       setOwnerName('')
       setPhone('')
-      setMessage(data.session ? 'Conta criada com sucesso. Faça login para continuar.' : 'Conta criada com sucesso. Confirme seu e-mail se for solicitado e faça login.')
+      setMessage(data.session ? 'Account created successfully. Sign in to continue.' : 'Account created successfully. Confirm your email if requested, then sign in.')
       setLoading(false)
       return
     }
@@ -123,7 +123,7 @@ export function Login({ onLogin }: Props) {
       workshopId: raw?.workshop_id ?? ownProfile?.workshop_id,
       name: ownProfile?.full_name ?? data.user.email!,
       role: raw?.role ?? 'customer',
-      workshopName: raw?.workshops?.name ?? 'Minha oficina',
+      workshopName: raw?.workshops?.name ?? 'My Workshop',
     })
   }
 
@@ -132,7 +132,7 @@ export function Login({ onLogin }: Props) {
     setMessage('')
   }
 
-  const submitText = mode === 'forgot' ? 'Enviar instruções' : mode === 'register' ? 'Criar conta' : 'Entrar na oficina'
+  const submitText = mode === 'forgot' ? 'Send instructions' : mode === 'register' ? 'Create account' : 'Enter the shop'
 
   return <main className="login-shell premium-login-shell">
     <section className="login-panel premium-login-panel">
@@ -141,29 +141,29 @@ export function Login({ onLogin }: Props) {
           <img src="/jas-motors-logo.png" alt="JAS Motors" />
         </div>
 
-        <span className="eyebrow login-eyebrow">{mode === 'register' ? 'COMECE AGORA' : 'BEM-VINDO DE VOLTA'}</span>
-        <h2>{mode === 'forgot' ? 'Recuperar acesso' : mode === 'register' ? 'Criar conta de cliente' : 'Entre na sua oficina'}</h2>
-        <p>{mode === 'forgot' ? 'Informe seu e-mail para receber as instruções.' : mode === 'register' ? 'Crie sua conta com seus dados básicos. Você adiciona veículo e agendamento depois de entrar.' : 'Use seus dados para acessar o painel.'}</p>
+        <span className="eyebrow login-eyebrow">{mode === 'register' ? 'GET STARTED' : 'WELCOME BACK'}</span>
+        <h2>{mode === 'forgot' ? 'Recover access' : mode === 'register' ? 'Create customer account' : 'Enter your shop'}</h2>
+        <p>{mode === 'forgot' ? 'Enter your email to receive reset instructions.' : mode === 'register' ? 'Create your customer account with basic details. Vehicle and appointment details are added after sign-in.' : 'Use your credentials to access your dashboard.'}</p>
 
         {mode === 'register' && <>
-          <label>Seu nome<div className="input-wrap premium-input"><UserRound /><input value={ownerName} onChange={e => setOwnerName(e.target.value)} required /></div></label>
-          <label>Telefone<div className="input-wrap premium-input"><UserRound /><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="(407) 555-1234" /></div></label>
+          <label>Full name<div className="input-wrap premium-input"><UserRound /><input value={ownerName} onChange={e => setOwnerName(e.target.value)} required /></div></label>
+          <label>Phone<div className="input-wrap premium-input"><UserRound /><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="(407) 555-1234" /></div></label>
         </>}
 
-        <label className="email-field">E-mail<div className="input-wrap premium-input"><Mail /><input type="email" placeholder="seu@email.com" value={email} autoComplete="email" onDoubleClick={() => setShowLoginHistory(true)} onFocus={() => setShowLoginHistory(false)} onChange={e => setEmail(e.target.value)} required /></div>{showLoginHistory && recentLogins.length > 0 && <div className="login-history">{recentLogins.map(item => <button type="button" key={item} onClick={() => { setEmail(item); setShowLoginHistory(false) }}>{item}</button>)}</div>}</label>
+        <label className="email-field">Email<div className="input-wrap premium-input"><Mail /><input type="email" placeholder="you@email.com" value={email} autoComplete="email" onDoubleClick={() => setShowLoginHistory(true)} onFocus={() => setShowLoginHistory(false)} onChange={e => setEmail(e.target.value)} required /></div>{showLoginHistory && recentLogins.length > 0 && <div className="login-history">{recentLogins.map(item => <button type="button" key={item} onClick={() => { setEmail(item); setShowLoginHistory(false) }}>{item}</button>)}</div>}</label>
 
-        {mode !== 'forgot' && <label>Senha<div className="input-wrap premium-input"><ClipboardCheck /><input type={showPassword ? 'text' : 'password'} placeholder="Sua senha" minLength={6} value={password} autoComplete="current-password" onChange={e => setPassword(e.target.value)} required /><button type="button" className="password-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}><Eye /></button></div></label>}
+        {mode !== 'forgot' && <label>Password<div className="input-wrap premium-input"><ClipboardCheck /><input type={showPassword ? 'text' : 'password'} placeholder="Your password" minLength={6} value={password} autoComplete="current-password" onChange={e => setPassword(e.target.value)} required /><button type="button" className="password-eye" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}><Eye /></button></div></label>}
 
-        {mode !== 'forgot' && <label className="remember-login premium-remember"><input type="checkbox" checked={rememberLogin} onChange={e => { setRememberLogin(e.target.checked); if (!e.target.checked) localStorage.removeItem(rememberedLoginKey) }} /><span>Lembrar deste login</span></label>}
+        {mode !== 'forgot' && <label className="remember-login premium-remember"><input type="checkbox" checked={rememberLogin} onChange={e => { setRememberLogin(e.target.checked); if (!e.target.checked) localStorage.removeItem(rememberedLoginKey) }} /><span>Remember this login</span></label>}
 
         {message && <div className="form-message">{message}</div>}
 
         <button className="primary-btn premium-login-submit" disabled={loading}>{loading ? <Loader2 className="spin" /> : <>{submitText} <ArrowRight /></>}</button>
 
-        <div className="login-links premium-login-links"><button type="button" className="link-btn" onClick={() => changeMode(mode === 'forgot' ? 'login' : 'forgot')}>{mode === 'forgot' ? 'Voltar ao login' : 'Esqueci minha senha'}</button><button type="button" className="link-btn" onClick={() => changeMode(mode === 'register' ? 'login' : 'register')}>{mode === 'register' ? 'Já tenho conta' : 'Criar conta'}</button></div>
+        <div className="login-links premium-login-links"><button type="button" className="link-btn" onClick={() => changeMode(mode === 'forgot' ? 'login' : 'forgot')}>{mode === 'forgot' ? 'Back to sign in' : 'Forgot password'}</button><button type="button" className="link-btn" onClick={() => changeMode(mode === 'register' ? 'login' : 'register')}>{mode === 'register' ? 'I already have an account' : 'Create account'}</button></div>
 
-        {!isSupabaseConfigured && <div className="demo-note premium-demo-note"><strong>Modo demonstração</strong><span>Sem Supabase configurado, o acesso abre a área do cliente.</span></div>}
-        <footer className="premium-login-footer"><ClipboardCheck />Seu negócio. Sua oficina. Seu controle.<span>JAS MOTORS SYSTEM</span></footer>
+        {!isSupabaseConfigured && <div className="demo-note premium-demo-note"><strong>Demo mode</strong><span>Supabase is not configured. The app will open the customer area.</span></div>}
+        <footer className="premium-login-footer"><ClipboardCheck />Your business. Your shop. Your control.<span>JAS MOTORS SYSTEM</span></footer>
       </form>
     </section>
   </main>
