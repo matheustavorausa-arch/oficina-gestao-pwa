@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { ArrowRight, ClipboardCheck, Eye, Loader2, Mail, UserRound, Wrench } from 'lucide-react'
+import { ArrowRight, ClipboardCheck, Eye, Loader2, Mail, UserRound } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { UserProfile } from '../types'
 
@@ -137,12 +137,8 @@ export function Login({ onLogin }: Props) {
   return <main className="login-shell premium-login-shell">
     <section className="login-panel premium-login-panel">
       <form className="login-card premium-login-card" onSubmit={submit}>
-        <div className="premium-logo" aria-label="JAS Motors">
-          <div className="premium-car-line" />
-          <strong>JAS</strong>
-          <span>MOTORS</span>
-          <small>AUTO REPAIR & SERVICE</small>
-          <i><Wrench /></i>
+        <div className="premium-logo v0-logo" aria-label="JAS Motors">
+          <img src="/jas-motors-logo.png" alt="JAS Motors" />
         </div>
 
         <span className="eyebrow login-eyebrow">{mode === 'register' ? 'COMECE AGORA' : 'BEM-VINDO DE VOLTA'}</span>
