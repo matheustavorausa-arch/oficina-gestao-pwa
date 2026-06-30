@@ -3,6 +3,7 @@ import { Bell, CalendarDays, Car, Check, ChevronRight, CircleDollarSign, Clipboa
 import { fetchServiceOrders } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
 import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '../lib/avatars'
+import { vehicleImageForText } from '../lib/vehicles'
 import type { ServiceOrder, ServiceStatus, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
@@ -19,8 +20,9 @@ const statusClass: Record<ServiceStatus, string> = {
 }
 
 function VehicleThumb({ order }: { order: ServiceOrder }) {
-  return order.vehicleImage
-    ? <img className="vehicle-thumb" src={order.vehicleImage} alt={order.vehicle} />
+  const image = order.vehicleImage || vehicleImageForText(order.vehicle, order.vehicleBodyType)
+  return image
+    ? <img className="vehicle-thumb" src={image} alt={order.vehicle} />
     : <span className="vehicle-thumb empty-thumb"><Car /></span>
 }
 
