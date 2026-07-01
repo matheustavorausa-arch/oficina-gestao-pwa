@@ -262,7 +262,7 @@ function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { p
         <div className="chat-messages">
           {loading && <div className="empty">Loading messages...</div>}
           {!loading && messages.map(message => <div key={message.id} className={message.isMine ? 'chat-row mine' : 'chat-row'}>
-            <span className={message.isMine ? 'chat-avatar customer' : 'chat-avatar shop'}>{message.isMine ? '🙂' : <img src={defaultMechanicAvatar} alt="Shop" />}</span>
+            <span className={message.isMine ? 'chat-avatar customer' : 'chat-avatar shop'}><img src={message.isMine ? '/customer-avatar.svg' : defaultMechanicAvatar} alt={message.isMine ? 'Customer' : 'Shop'} /></span>
             <article className={message.isMine ? 'chat-bubble mine' : 'chat-bubble'}>
               <small>{message.isMine ? 'You' : 'Shop'} · {new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(message.createdAt))}</small>
               {message.attachmentUrl && <a href={message.attachmentUrl} target="_blank" rel="noreferrer"><img className="chat-photo" src={message.attachmentUrl} alt="Chat attachment" /></a>}
