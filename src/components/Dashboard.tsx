@@ -22,7 +22,7 @@ const statusClass: Record<ServiceStatus, string> = {
 }
 
 function VehicleThumb({ order }: { order: ServiceOrder }) {
-  const image = order.vehicleImage || vehicleImageForText(order.vehicle, order.vehicleBodyType)
+  const image = vehicleImageForText(order.vehicle, order.vehicleBodyType, order.vehicleImage)
   return image
     ? <img className="vehicle-thumb" src={image} alt={order.vehicle} />
     : <span className="vehicle-thumb empty-thumb"><Car /></span>

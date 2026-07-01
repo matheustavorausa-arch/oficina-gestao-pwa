@@ -38,7 +38,7 @@ export async function fetchCustomerVehicles(): Promise<CustomerVehicle[]> {
     year: vehicle.year,
     color: vehicle.color,
     plate: vehicle.plate,
-    imageUrl: vehicle.vehicle_model_catalog?.image_url || vehicleImageForMakeModel(vehicle.make, vehicle.model),
+    imageUrl: vehicleImageForMakeModel(vehicle.make, vehicle.model) || vehicle.vehicle_model_catalog?.image_url || '/catalog/generic-car.svg',
   }))
 }
 

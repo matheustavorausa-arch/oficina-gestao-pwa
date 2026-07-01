@@ -20,7 +20,7 @@ function RoleHeader({ profile, onLogout, title }: Props & { title: string }) {
 function Toast({ text }: { text: string }) { return text ? <div className="toast"><Check />{text}</div> : null }
 
 function OrderVehicleImage({ order, className = 'vehicle-thumb' }: { order: ServiceOrder; className?: string }) {
-  return <img className={className} src={order.vehicleImage || vehicleImageForText(order.vehicle, order.vehicleBodyType)} alt={order.vehicle} />
+  return <img className={className} src={vehicleImageForText(order.vehicle, order.vehicleBodyType, order.vehicleImage)} alt={order.vehicle} />
 }
 
 export function MechanicDashboard({ profile, onLogout }: Props) {

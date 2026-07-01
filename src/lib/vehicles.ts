@@ -5,6 +5,7 @@ export interface VehicleModel {
   model: string
   bodyType: BodyType
   years: number[]
+  imageUrl?: string
 }
 
 export const OTHER_VEHICLE_MAKE = 'Other'
@@ -92,12 +93,33 @@ export const VEHICLES: VehicleModel[] = [
   { make: 'Toyota', model: 'Sienna', bodyType: 'minivan', years: recentYears() },
 ]
 
+const SPECIFIC_VEHICLE_IMAGES: Record<string, string> = {
+  'chevrolet|silverado 1500': '/catalog/chevrolet-silverado.svg',
+  'ford|ecosport': '/catalog/ford-ecosport.svg',
+  'ford|f-150': '/catalog/ford-f-150.svg',
+  'honda|accord': '/catalog/honda-accord.svg',
+  'honda|civic': '/catalog/honda-civic.svg',
+  'honda|cr-v': '/catalog/honda-cr-v.svg',
+  'hyundai|elantra': '/catalog/hyundai-elantra.svg',
+  'jeep|grand cherokee': '/catalog/jeep-grand-cherokee.svg',
+  'kia|telluride': '/catalog/kia-telluride.svg',
+  'nissan|altima': '/catalog/nissan-altima.svg',
+  'ram|1500': '/catalog/ram-1500.svg',
+  'tesla|model 3': '/catalog/tesla-model-3.svg',
+  'tesla|model y': '/catalog/tesla-model-y.svg',
+  'toyota|camry': '/catalog/toyota-camry.svg',
+  'toyota|corolla': '/catalog/toyota-corolla.svg',
+  'toyota|rav4': '/catalog/toyota-rav4.svg',
+}
+
 export const VEHICLE_MAKE_OPTIONS = [
   ...Array.from(new Set(VEHICLES.map(vehicle => vehicle.make))).filter(make => make !== OTHER_VEHICLE_MAKE).sort(),
   OTHER_VEHICLE_MAKE,
 ]
 
 export function vehicleImageForBodyType(bodyType?: string | null) {
+  if (bodyType === 'truck') return BODY_TYPE_IMAGE.pickup
+  if (bodyType === 'ev') return BODY_TYPE_IMAGE.sedan
   return bodyType && bodyType in BODY_TYPE_IMAGE ? BODY_TYPE_IMAGE[bodyType as BodyType] : '/car-sedan.png'
 }
 
@@ -107,13 +129,22 @@ export function findVehicleModel(make?: string, model?: string) {
   return VEHICLES.find(vehicle => vehicle.make.toLowerCase() === cleanMake && vehicle.model.toLowerCase() === cleanModel)
 }
 
-export function vehicleImageForMakeModel(make?: string, model?: string) {
-  return vehicleImageForBodyType(findVehicleModel(make, model)?.bodyType)
+export function vehicleSpecificImageForMakeModel(make?: string, model?: string) {
+  const cleanMake = make?.trim().toLowerCase()
+  const cleanModel = model?.trim().toLowerCase()
+  if (!cleanMake || !cleanModel) return undefined
+  return SPECIFIC_VEHICLE_IMAGES[`${cleanMake}|${cleanModel}`]
 }
 
-export function vehicleImageForText(vehicleText?: string, bodyType?: string | null) {
-  if (bodyType) return vehicleImageForBodyType(bodyType)
+export function vehicleImageForMakeModel(make?: string, model?: string) {
+  return vehicleSpecificImageForMakeModel(make, model) || vehicleImageForBodyType(findVehicleModel(make, model)?.bodyType)
+}
+
+export function vehicleImageForText(vehicleText?: string, bodyType?: string | null, preferredImage?: string | null) {
   const text = vehicleText?.toLowerCase() ?? ''
   const match = VEHICLES.find(vehicle => text.includes(vehicle.make.toLowerCase()) && text.includes(vehicle.model.toLowerCase()))
-  return vehicleImageForBodyType(match?.bodyType)
+  if (match) return vehicleImageForMakeModel(match.make, match.model)
+  if (preferredImage && !preferredImage.includes('/catalog/generic-car.svg')) return preferredImage
+  if (bodyType) return vehicleImageForBodyType(bodyType)
+  return '/catalog/generic-car.svg'
 }
