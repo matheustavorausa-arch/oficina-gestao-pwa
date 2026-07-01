@@ -7,9 +7,10 @@ import { workshopSchedulingConfig } from '../config/workshop'
 import { VEHICLES, findVehicleModel, vehicleImageForText } from '../lib/vehicles'
 import { cancelRepairOrder } from '../lib/cancellations'
 import { deleteCustomerVehicle, fetchCustomerVehicles, saveCustomerVehicle, type CustomerVehicle } from '../lib/customerVehicles'
+import { fetchCustomerProfile, updateCustomerProfile, type CustomerProfileSettings } from '../lib/customerProfile'
 import type { ServiceOrder, UserProfile } from '../types'
 
-interface Props { profile: UserProfile; onLogout: () => void }
+interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
 
 function RoleHeader({ profile, onLogout, title }: Props & { title: string }) {
   return <header className="role-header"><div className="role-logo jas-brand"><span className="brand-mark"><Wrench /></span><div><strong><b>JAS</b> MOTORS</strong><small>{profile.workshopName}</small></div></div><span className="role-title">{title}</span><div className="role-head-actions"><button><Bell /><i /></button><button onClick={onLogout} title="Log out"><LogOut /></button></div></header>
@@ -115,26 +116,30 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
   </div>
 }
 
-export function CustomerDashboard({ profile, onLogout }: Props) {
+export function CustomerDashboard({ profile, onLogout, onProfileChange }: Props) {
   const [toast, setToast] = useState('')
-  const [view, setView] = useState<'home' | 'booking' | 'history' | 'vehicles'>('home')
+  const [view, setView] = useState<'home' | 'booking' | 'history' | 'vehicles' | 'profile'>('home')
   const [remoteOrders, setRemoteOrders] = useState<ServiceOrder[]>([])
   const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([])
+  const [customerSettings, setCustomerSettings] = useState<CustomerProfileSettings | null>(null)
   const activeOrder = remoteOrders.find(order => order.status !== 'Completed' && order.status !== 'Cancelled') ?? null
   function action(text: string) { setToast(text); setTimeout(() => setToast(''), 2300) }
   const loadCustomerVehicles = () => fetchCustomerVehicles().then(setCustomerVehicles).catch(error => action(error.message ?? 'Could not load vehicles.'))
+  const loadCustomerProfile = () => fetchCustomerProfile().then(setCustomerSettings).catch(error => action(error.message ?? 'Could not load profile.'))
 
   useEffect(() => {
     if (!supabase || !profile.workshopId) return
     const loadOrders = () => fetchServiceOrders(profile).then(setRemoteOrders).catch(() => undefined)
     loadOrders()
     loadCustomerVehicles()
+    loadCustomerProfile()
     const client = supabase
     const channel = client
       .channel(`customer-orders-${profile.userId}-${profile.workshopId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_orders', filter: `workshop_id=eq.${profile.workshopId}` }, loadOrders)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `workshop_id=eq.${profile.workshopId}` }, loadOrders)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles', filter: `workshop_id=eq.${profile.workshopId}` }, () => { loadCustomerVehicles() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${profile.userId}` }, () => { loadCustomerProfile() })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.userId}` }, payload => {
         const notification = payload.new as { title?: string; body?: string }
         action(`${notification.title ?? 'Notification'}: ${notification.body ?? ''}`)
@@ -149,15 +154,67 @@ export function CustomerDashboard({ profile, onLogout }: Props) {
     <RoleHeader profile={profile} onLogout={onLogout} title="Customer Area" />
     <main className="role-content customer-content">
       <section className="customer-hero"><div><span className="eyebrow">WELCOME TO YOUR GARAGE</span><h1>Hello, {profile.name.split(' ')[0]}.</h1><p>Track your vehicle and schedule services without calling the shop.</p><button className="primary-btn" onClick={() => setView('booking')}><CalendarDays /> Schedule service</button></div><button type="button" className="vehicle-card vehicle-card-button" onClick={() => setView('vehicles')}><span className="vehicle-art">{activeOrder ? <OrderVehicleImage order={activeOrder} className="vehicle-art-image" /> : customerVehicles[0] ? <img className="vehicle-art-image" src={customerVehicles[0].imageUrl} alt={`${customerVehicles[0].make} ${customerVehicles[0].model}`} /> : <Car />}</span><p><small>{activeOrder ? 'ACTIVE VEHICLE' : customerVehicles.length ? 'MY GARAGE' : 'FIRST STEP'}</small><strong>{activeOrder?.vehicle ?? (customerVehicles[0] ? `${customerVehicles[0].make} ${customerVehicles[0].model}` : 'Add your vehicle')}</strong><span>{activeOrder ? `${activeOrder.plate} · ${activeOrder.status}` : customerVehicles.length ? `${customerVehicles.length} vehicle${customerVehicles.length === 1 ? '' : 's'} saved` : 'Create your garage before scheduling'}</span></p><ChevronRight /></button></section>
-      {view === 'booking' ? <Booking profile={profile} vehicles={customerVehicles} onBack={() => setView('home')} onConfirm={() => { loadCustomerVehicles(); setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} onBack={() => setView('home')} /> : view === 'vehicles' ? <MyVehicles vehicles={customerVehicles} onBack={() => setView('home')} onChanged={async message => { await loadCustomerVehicles(); action(message) }} /> : <>
+      {view === 'booking' ? <Booking profile={profile} vehicles={customerVehicles} onBack={() => setView('home')} onConfirm={() => { loadCustomerVehicles(); setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} onBack={() => setView('home')} /> : view === 'vehicles' ? <MyVehicles vehicles={customerVehicles} onBack={() => setView('home')} onChanged={async message => { await loadCustomerVehicles(); action(message) }} /> : view === 'profile' ? <CustomerProfileView profile={profile} settings={customerSettings} onBack={() => setView('home')} onSaved={settings => { setCustomerSettings(settings); onProfileChange?.({ ...profile, name: settings.fullName || profile.name }); action('Profile updated.') }} /> : <>
         <section className="customer-grid"><article className="role-panel live-service">{activeOrder ? <><div className="role-panel-head"><div><span className="eyebrow">REAL-TIME SERVICE TRACKING</span><h2>{activeOrder.service}</h2><p>{activeOrder.code} · {activeOrder.vehicle}</p></div><span className="status green">{activeOrder.status}</span></div><div className="customer-timeline">{['Appointment created','Vehicle received','Checklist and diagnosis','Service in progress','Ready for pickup'].map((step,index) => <div className={index === 0 ? 'done' : ''} key={step}><span>{index === 0 ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index === 0 ? 'Now' : 'Pending'}</small></p></div>)}</div><div className="live-actions"><button className="secondary-btn" onClick={() => action('Repair order chat opened.')}><MessageCircle /> Message the shop</button><button className="secondary-btn danger-btn" onClick={async () => { if (!confirm(`Cancel appointment ${activeOrder.code}?`)) return; try { await cancelRepairOrder(activeOrder.id, 'Cancelled by customer.'); setRemoteOrders(await fetchServiceOrders(profile)); action('Appointment cancelled. The shop was notified.') } catch (error) { action(error instanceof Error ? error.message : 'Could not cancel appointment.') } }}>Cancel appointment</button><button className="primary-btn" onClick={() => action('Repair order details loaded.')}><FileText /> View details</button></div></> : <div className="empty">No service created yet. Click Schedule service to begin.</div>}</article>
-          <aside className="customer-side"><article className="role-panel estimate-card"><ReceiptText /><span>{activeOrder ? 'Repair order estimate' : 'No estimate'}</span><strong>{activeOrder ? activeOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '$0.00'}</strong><small>{activeOrder ? activeOrder.status : 'Waiting for first service'}</small><button onClick={() => action(activeOrder ? 'Estimate opened.' : 'No estimate created yet.')}>View estimate <ChevronRight /></button></article><article className="role-panel quick-card"><h2>Quick access</h2><button onClick={() => setView('vehicles')}><Car />My vehicles<ChevronRight /></button><button onClick={() => setView('history')}><History />Vehicle history<ChevronRight /></button><button onClick={() => action('Vehicle documents loaded.')}><ClipboardCheck />Documents and checklists<ChevronRight /></button><button onClick={() => action('Preferences opened.')}><Settings2 />Preferences<ChevronRight /></button></article></aside>
+          <aside className="customer-side"><article className="role-panel estimate-card"><ReceiptText /><span>{activeOrder ? 'Repair order estimate' : 'No estimate'}</span><strong>{activeOrder ? activeOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '$0.00'}</strong><small>{activeOrder ? activeOrder.status : 'Waiting for first service'}</small><button onClick={() => action(activeOrder ? 'Estimate opened.' : 'No estimate created yet.')}>View estimate <ChevronRight /></button></article><article className="role-panel quick-card"><h2>Quick access</h2><button onClick={() => setView('vehicles')}><Car />My vehicles<ChevronRight /></button><button onClick={() => setView('history')}><History />Vehicle history<ChevronRight /></button><button onClick={() => action('Vehicle documents loaded.')}><ClipboardCheck />Documents and checklists<ChevronRight /></button><button onClick={() => setView('profile')}><Settings2 />Profile settings<ChevronRight /></button></article></aside>
         </section>
         <section className="role-panel next-care"><div><span className="eyebrow">NEXT CARE</span><h2>{activeOrder ? 'Track the next service steps' : 'No service scheduled yet'}</h2><p>{activeOrder ? 'The shop updates the status in real time.' : 'Create the first appointment to start the vehicle history.'}</p></div><Gauge /><button className="secondary-btn" onClick={() => setView('booking')}>Schedule now</button></section>
       </>}
     </main>
-    <nav className="role-bottom-nav"><button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}><Home />Home</button><button className={view === 'booking' ? 'active' : ''} onClick={() => setView('booking')}><CalendarDays />Schedule</button><button className={view === 'vehicles' ? 'active' : ''} onClick={() => setView('vehicles')}><Car />Vehicles</button><button onClick={() => action('Messages opened.')}><MessageCircle />Messages</button><button><UserRound />Profile</button></nav><Toast text={toast} />
+    <nav className="role-bottom-nav"><button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}><Home />Home</button><button className={view === 'booking' ? 'active' : ''} onClick={() => setView('booking')}><CalendarDays />Schedule</button><button className={view === 'vehicles' ? 'active' : ''} onClick={() => setView('vehicles')}><Car />Vehicles</button><button onClick={() => action('Messages opened.')}><MessageCircle />Messages</button><button className={view === 'profile' ? 'active' : ''} onClick={() => setView('profile')}><UserRound />Profile</button></nav><Toast text={toast} />
   </div>
+}
+
+function CustomerProfileView({ profile, settings, onBack, onSaved }: { profile: UserProfile; settings: CustomerProfileSettings | null; onBack: () => void; onSaved: (settings: CustomerProfileSettings) => void }) {
+  const [fullName, setFullName] = useState(settings?.fullName || profile.name)
+  const [phone, setPhone] = useState(settings?.phone ?? '')
+  const [email, setEmail] = useState(settings?.email ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setFullName(settings?.fullName || profile.name)
+    setPhone(settings?.phone ?? '')
+    setEmail(settings?.email ?? '')
+  }, [settings, profile.name])
+
+  async function saveProfile() {
+    setSaving(true)
+    setError('')
+    try {
+      const updated = await updateCustomerProfile({ fullName, phone })
+      onSaved(updated)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not update profile.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <section className="role-panel profile-view">
+    <button className="back-link" onClick={onBack}>Back</button>
+    <span className="eyebrow">CUSTOMER PROFILE</span>
+    <h1>Edit your profile</h1>
+    <p>Keep your contact information updated so the shop can reach you about appointments, estimates, and pickup updates.</p>
+    <div className="profile-layout">
+      <aside className="profile-summary-card">
+        <span className="profile-avatar"><UserRound /></span>
+        <strong>{fullName || 'Customer'}</strong>
+        <small>{email || 'Account email'}</small>
+        <p>Changes here update the customer dashboard and the shop records connected to this login.</p>
+      </aside>
+      <div className="profile-form-card">
+        <div className="booking-form">
+          <label className="wide">Full name<input value={fullName} onChange={event => setFullName(event.target.value)} placeholder="John Silva" /></label>
+          <label className="wide">Phone<input value={phone} onChange={event => setPhone(event.target.value)} placeholder="(407) 555-1234" /></label>
+          <label className="wide">Email<input value={email} readOnly className="readonly-input" /></label>
+        </div>
+        <small className="profile-note">Email is used for login. Email and password changes will be added in a separate account security step.</small>
+        {error && <div className="form-message">{error}</div>}
+        <div className="modal-actions"><button className="secondary-btn" onClick={onBack}>Cancel</button><button className="primary-btn" disabled={saving} onClick={saveProfile}>{saving ? 'Saving...' : 'Save profile'}</button></div>
+      </div>
+    </div>
+  </section>
 }
 
 function MyVehicles({ vehicles, onBack, onChanged }: { vehicles: CustomerVehicle[]; onBack: () => void; onChanged: (message: string) => Promise<void> }) {

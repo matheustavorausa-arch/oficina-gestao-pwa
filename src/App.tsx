@@ -94,6 +94,6 @@ export default function App() {
 
   if (!profile) return <Login onLogin={login} />
   if (profile.role === 'mechanic') return <MechanicDashboard profile={profile} onLogout={logout} />
-  if (profile.role === 'customer') return <CustomerDashboard profile={profile} onLogout={logout} />
+  if (profile.role === 'customer') return <CustomerDashboard profile={profile} onLogout={logout} onProfileChange={updateProfile} />
   return <Dashboard profile={profile} onLogout={logout} onProfileChange={updateProfile} />
 }
