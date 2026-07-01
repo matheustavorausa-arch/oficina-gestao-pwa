@@ -8,6 +8,7 @@ import { OTHER_VEHICLE_MAKE, VEHICLES, VEHICLE_MAKE_OPTIONS, findVehicleModel, v
 import { cancelRepairOrder } from '../lib/cancellations'
 import { deleteCustomerVehicle, fetchCustomerVehicles, saveCustomerVehicle, type CustomerVehicle } from '../lib/customerVehicles'
 import { fetchCustomerProfile, updateCustomerProfile, type CustomerProfileSettings } from '../lib/customerProfile'
+import { fetchOrderChatMessages, sendOrderChatMessage, type OrderChatMessage } from '../lib/orderChat'
 import type { ServiceOrder, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
@@ -118,7 +119,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
 
 export function CustomerDashboard({ profile, onLogout, onProfileChange }: Props) {
   const [toast, setToast] = useState('')
-  const [view, setView] = useState<'home' | 'booking' | 'history' | 'vehicles' | 'profile'>('home')
+  const [view, setView] = useState<'home' | 'booking' | 'history' | 'vehicles' | 'profile' | 'messages'>('home')
   const [remoteOrders, setRemoteOrders] = useState<ServiceOrder[]>([])
   const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([])
   const [customerSettings, setCustomerSettings] = useState<CustomerProfileSettings | null>(null)
@@ -154,15 +155,108 @@ export function CustomerDashboard({ profile, onLogout, onProfileChange }: Props)
     <RoleHeader profile={profile} onLogout={onLogout} title="Customer Area" />
     <main className="role-content customer-content">
       <section className="customer-hero"><div><span className="eyebrow">WELCOME TO YOUR GARAGE</span><h1>Hello, {profile.name.split(' ')[0]}.</h1><p>Track your vehicle and schedule services without calling the shop.</p><button className="primary-btn" onClick={() => setView('booking')}><CalendarDays /> Schedule service</button></div><button type="button" className="vehicle-card vehicle-card-button" onClick={() => setView('vehicles')}><span className="vehicle-art">{activeOrder ? <OrderVehicleImage order={activeOrder} className="vehicle-art-image" /> : customerVehicles[0] ? <img className="vehicle-art-image" src={customerVehicles[0].imageUrl} alt={`${customerVehicles[0].make} ${customerVehicles[0].model}`} /> : <Car />}</span><p><small>{activeOrder ? 'ACTIVE VEHICLE' : customerVehicles.length ? 'MY GARAGE' : 'FIRST STEP'}</small><strong>{activeOrder?.vehicle ?? (customerVehicles[0] ? `${customerVehicles[0].make} ${customerVehicles[0].model}` : 'Add your vehicle')}</strong><span>{activeOrder ? `${activeOrder.plate} · ${activeOrder.status}` : customerVehicles.length ? `${customerVehicles.length} vehicle${customerVehicles.length === 1 ? '' : 's'} saved` : 'Create your garage before scheduling'}</span></p><ChevronRight /></button></section>
-      {view === 'booking' ? <Booking profile={profile} vehicles={customerVehicles} onBack={() => setView('home')} onConfirm={() => { loadCustomerVehicles(); setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} vehicles={customerVehicles} onBack={() => setView('home')} onSchedule={() => setView('booking')} /> : view === 'vehicles' ? <MyVehicles vehicles={customerVehicles} onBack={() => setView('home')} onChanged={async message => { await loadCustomerVehicles(); action(message) }} /> : view === 'profile' ? <CustomerProfileView profile={profile} settings={customerSettings} onBack={() => setView('home')} onSaved={settings => { setCustomerSettings(settings); onProfileChange?.({ ...profile, name: settings.fullName || profile.name }); action('Profile updated.') }} /> : <>
-        <section className="customer-grid"><article className="role-panel live-service">{activeOrder ? <><div className="role-panel-head"><div><span className="eyebrow">REAL-TIME SERVICE TRACKING</span><h2>{activeOrder.service}</h2><p>{activeOrder.code} · {activeOrder.vehicle}</p></div><span className="status green">{activeOrder.status}</span></div><div className="customer-timeline">{['Appointment created','Vehicle received','Checklist and diagnosis','Service in progress','Ready for pickup'].map((step,index) => <div className={index === 0 ? 'done' : ''} key={step}><span>{index === 0 ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index === 0 ? 'Now' : 'Pending'}</small></p></div>)}</div><div className="live-actions"><button className="secondary-btn" onClick={() => action('Repair order chat opened.')}><MessageCircle /> Message the shop</button><button className="secondary-btn danger-btn" onClick={async () => { if (!confirm(`Cancel appointment ${activeOrder.code}?`)) return; try { await cancelRepairOrder(activeOrder.id, 'Cancelled by customer.'); setRemoteOrders(await fetchServiceOrders(profile)); action('Appointment cancelled. The shop was notified.') } catch (error) { action(error instanceof Error ? error.message : 'Could not cancel appointment.') } }}>Cancel appointment</button><button className="primary-btn" onClick={() => action('Repair order details loaded.')}><FileText /> View details</button></div></> : <div className="empty">No service created yet. Click Schedule service to begin.</div>}</article>
+      {view === 'booking' ? <Booking profile={profile} vehicles={customerVehicles} onBack={() => setView('home')} onConfirm={() => { loadCustomerVehicles(); setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} vehicles={customerVehicles} onBack={() => setView('home')} onSchedule={() => setView('booking')} /> : view === 'vehicles' ? <MyVehicles vehicles={customerVehicles} onBack={() => setView('home')} onChanged={async message => { await loadCustomerVehicles(); action(message) }} /> : view === 'profile' ? <CustomerProfileView profile={profile} settings={customerSettings} onBack={() => setView('home')} onSaved={settings => { setCustomerSettings(settings); onProfileChange?.({ ...profile, name: settings.fullName || profile.name }); action('Profile updated.') }} /> : view === 'messages' ? <OrderChatView profile={profile} orders={remoteOrders} activeOrder={activeOrder} onBack={() => setView('home')} onSchedule={() => setView('booking')} /> : <>
+        <section className="customer-grid"><article className="role-panel live-service">{activeOrder ? <><div className="role-panel-head"><div><span className="eyebrow">REAL-TIME SERVICE TRACKING</span><h2>{activeOrder.service}</h2><p>{activeOrder.code} · {activeOrder.vehicle}</p></div><span className="status green">{activeOrder.status}</span></div><div className="customer-timeline">{['Appointment created','Vehicle received','Checklist and diagnosis','Service in progress','Ready for pickup'].map((step,index) => <div className={index === 0 ? 'done' : ''} key={step}><span>{index === 0 ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index === 0 ? 'Now' : 'Pending'}</small></p></div>)}</div><div className="live-actions"><button className="secondary-btn" onClick={() => setView('messages')}><MessageCircle /> Message the shop</button><button className="secondary-btn danger-btn" onClick={async () => { if (!confirm(`Cancel appointment ${activeOrder.code}?`)) return; try { await cancelRepairOrder(activeOrder.id, 'Cancelled by customer.'); setRemoteOrders(await fetchServiceOrders(profile)); action('Appointment cancelled. The shop was notified.') } catch (error) { action(error instanceof Error ? error.message : 'Could not cancel appointment.') } }}>Cancel appointment</button><button className="primary-btn" onClick={() => action('Repair order details loaded.')}><FileText /> View details</button></div></> : <div className="empty">No service created yet. Click Schedule service to begin.</div>}</article>
           <aside className="customer-side"><article className="role-panel estimate-card"><ReceiptText /><span>{activeOrder ? 'Repair order estimate' : 'No estimate'}</span><strong>{activeOrder ? activeOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '$0.00'}</strong><small>{activeOrder ? activeOrder.status : 'Waiting for first service'}</small><button onClick={() => action(activeOrder ? 'Estimate opened.' : 'No estimate created yet.')}>View estimate <ChevronRight /></button></article><article className="role-panel quick-card"><h2>Quick access</h2><button onClick={() => setView('vehicles')}><Car />My vehicles<ChevronRight /></button><button onClick={() => setView('history')}><History />Vehicle history<ChevronRight /></button><button onClick={() => action('Vehicle documents loaded.')}><ClipboardCheck />Documents and checklists<ChevronRight /></button><button onClick={() => setView('profile')}><Settings2 />Profile settings<ChevronRight /></button></article></aside>
         </section>
         <section className="role-panel next-care"><div><span className="eyebrow">NEXT CARE</span><h2>{activeOrder ? 'Track the next service steps' : 'No service scheduled yet'}</h2><p>{activeOrder ? 'The shop updates the status in real time.' : 'Create the first appointment to start the vehicle history.'}</p></div><Gauge /><button className="secondary-btn" onClick={() => setView('booking')}>Schedule now</button></section>
       </>}
     </main>
-    <nav className="role-bottom-nav"><button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}><Home />Home</button><button className={view === 'booking' ? 'active' : ''} onClick={() => setView('booking')}><CalendarDays />Schedule</button><button className={view === 'vehicles' ? 'active' : ''} onClick={() => setView('vehicles')}><Car />Vehicles</button><button onClick={() => action('Messages opened.')}><MessageCircle />Messages</button><button className={view === 'profile' ? 'active' : ''} onClick={() => setView('profile')}><UserRound />Profile</button></nav><Toast text={toast} />
+    <nav className="role-bottom-nav"><button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}><Home />Home</button><button className={view === 'booking' ? 'active' : ''} onClick={() => setView('booking')}><CalendarDays />Schedule</button><button className={view === 'vehicles' ? 'active' : ''} onClick={() => setView('vehicles')}><Car />Vehicles</button><button className={view === 'messages' ? 'active' : ''} onClick={() => setView('messages')}><MessageCircle />Messages</button><button className={view === 'profile' ? 'active' : ''} onClick={() => setView('profile')}><UserRound />Profile</button></nav><Toast text={toast} />
   </div>
+}
+
+function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { profile: UserProfile; orders: ServiceOrder[]; activeOrder: ServiceOrder | null; onBack: () => void; onSchedule: () => void }) {
+  const chatOrders = orders.filter(order => order.status !== 'Cancelled')
+  const [selectedOrderId, setSelectedOrderId] = useState(activeOrder?.id ?? chatOrders[0]?.id ?? '')
+  const [messages, setMessages] = useState<OrderChatMessage[]>([])
+  const [draft, setDraft] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+  const selectedOrder = chatOrders.find(order => order.id === selectedOrderId) ?? null
+
+  useEffect(() => {
+    if (!selectedOrderId && chatOrders[0]) setSelectedOrderId(chatOrders[0].id)
+  }, [selectedOrderId, chatOrders])
+
+  useEffect(() => {
+    if (!supabase || !selectedOrderId) return
+    let ignore = false
+    const loadMessages = () => {
+      setLoading(true)
+      fetchOrderChatMessages(selectedOrderId, profile.userId)
+        .then(items => { if (!ignore) setMessages(items) })
+        .catch(error => { if (!ignore) setError(error.message ?? 'Could not load messages.') })
+        .finally(() => { if (!ignore) setLoading(false) })
+    }
+    loadMessages()
+    const client = supabase
+    const channel = client
+      .channel(`order-chat-${selectedOrderId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages', filter: `service_order_id=eq.${selectedOrderId}` }, loadMessages)
+      .subscribe()
+    return () => {
+      ignore = true
+      client.removeChannel(channel)
+    }
+  }, [selectedOrderId, profile.userId])
+
+  async function sendMessage() {
+    const body = draft.trim()
+    if (!selectedOrder || !body) return
+    setSending(true)
+    setError('')
+    try {
+      await sendOrderChatMessage(selectedOrder.id, body)
+      setDraft('')
+      setMessages(await fetchOrderChatMessages(selectedOrder.id, profile.userId))
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not send message.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (!chatOrders.length) {
+    return <section className="role-panel chat-view">
+      <button className="back-link" onClick={onBack}>Back</button>
+      <span className="eyebrow">MESSAGES</span>
+      <h1>Chat with the shop</h1>
+      <div className="empty chat-empty"><MessageCircle /><strong>No repair order yet.</strong><p>Schedule a service to start messaging the shop.</p><button className="primary-btn" onClick={onSchedule}><CalendarDays /> Schedule service</button></div>
+    </section>
+  }
+
+  return <section className="role-panel chat-view">
+    <div className="history-head"><button className="back-link" onClick={onBack}>Back</button>{selectedOrder && <span className="status green">{selectedOrder.status}</span>}</div>
+    <span className="eyebrow">MESSAGES</span>
+    <h1>Chat with the shop</h1>
+    <p>Messages are saved inside the repair order and update in real time.</p>
+    <div className="chat-layout">
+      <aside className="chat-orders">
+        {chatOrders.map(order => <button key={order.id} className={selectedOrderId === order.id ? 'active' : ''} onClick={() => setSelectedOrderId(order.id)}>
+          <OrderVehicleImage order={order} className="chat-order-image" />
+          <span><strong>{order.code}</strong><small>{order.vehicle}</small></span>
+        </button>)}
+      </aside>
+      <div className="chat-panel">
+        {selectedOrder && <div className="chat-title"><OrderVehicleImage order={selectedOrder} className="chat-title-image" /><div><strong>{selectedOrder.vehicle}</strong><span>{selectedOrder.code} · {selectedOrder.plate}</span></div></div>}
+        <div className="chat-messages">
+          {loading && <div className="empty">Loading messages...</div>}
+          {!loading && messages.map(message => <article key={message.id} className={message.isMine ? 'chat-bubble mine' : 'chat-bubble'}>
+            <small>{message.isMine ? 'You' : 'Shop'} · {new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(message.createdAt))}</small>
+            <p>{message.body}</p>
+          </article>)}
+          {!loading && messages.length === 0 && <div className="empty">No messages yet. Send the first update to the shop.</div>}
+        </div>
+        {error && <div className="form-message">{error}</div>}
+        <div className="chat-composer">
+          <textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Type your message to the shop..." onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage() } }} />
+          <button className="primary-btn" disabled={sending || !draft.trim()} onClick={sendMessage}><Send /> {sending ? 'Sending...' : 'Send'}</button>
+        </div>
+      </div>
+    </div>
+  </section>
 }
 
 function CustomerProfileView({ profile, settings, onBack, onSaved }: { profile: UserProfile; settings: CustomerProfileSettings | null; onBack: () => void; onSaved: (settings: CustomerProfileSettings) => void }) {
