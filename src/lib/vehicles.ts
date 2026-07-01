@@ -9,6 +9,7 @@ export interface VehicleModel {
 }
 
 export const OTHER_VEHICLE_MAKE = 'Other'
+export const OTHER_VEHICLE_MODEL = 'Other model'
 
 export const BODY_TYPE_IMAGE: Record<BodyType, string> = {
   sedan: '/cars/sedan.png',
@@ -86,6 +87,7 @@ export const VEHICLES: VehicleModel[] = [
   { make: 'Kia', model: 'Sportage', bodyType: 'suv', years: recentYears() },
   { make: 'Kia', model: 'Sorento', bodyType: 'suv', years: recentYears() },
   { make: 'Kia', model: 'Seltos', bodyType: 'suv', years: recentYears(2021) },
+  { make: 'Kia', model: 'Niro', bodyType: 'suv', years: recentYears() },
   { make: 'Subaru', model: 'Outback', bodyType: 'suv', years: recentYears() },
   { make: 'Subaru', model: 'Forester', bodyType: 'suv', years: recentYears() },
   { make: 'Subaru', model: 'Crosstrek', bodyType: 'suv', years: recentYears() },
