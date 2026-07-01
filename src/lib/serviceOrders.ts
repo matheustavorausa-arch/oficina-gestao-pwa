@@ -23,7 +23,7 @@ const statusMap: Record<string, ServiceStatus> = {
   quality_check: 'In Progress',
   completed: 'Completed',
   delivered: 'Completed',
-  cancelled: 'Completed',
+  cancelled: 'Cancelled',
 }
 
 function progressFor(status: string) {

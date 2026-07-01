@@ -4,6 +4,7 @@ import { fetchServiceOrders } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
 import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '../lib/avatars'
 import { vehicleImageForText } from '../lib/vehicles'
+import { cancelRepairOrder } from '../lib/cancellations'
 import type { ServiceOrder, ServiceStatus, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
@@ -17,6 +18,7 @@ const statusClass: Record<ServiceStatus, string> = {
   Estimate: 'amber',
   'In Progress': 'green',
   Completed: 'dark',
+  Cancelled: 'gray',
 }
 
 function VehicleThumb({ order }: { order: ServiceOrder }) {
@@ -30,7 +32,7 @@ function money(value: number) {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
 
-function OrderModal({ order, onClose }: { order: ServiceOrder; onClose: () => void }) {
+function OrderModal({ order, onClose, onCancel }: { order: ServiceOrder; onClose: () => void; onCancel: (order: ServiceOrder) => void }) {
   const steps = ['Vehicle intake', 'Initial checklist', 'Diagnosis', 'Estimate approval', 'Repair in progress', 'Delivery']
   const current = Math.max(1, Math.ceil(order.progress / 17))
   return <div className="modal-backdrop" onClick={onClose}><article className="modal" onClick={event => event.stopPropagation()}>
@@ -39,12 +41,12 @@ function OrderModal({ order, onClose }: { order: ServiceOrder; onClose: () => vo
     <span className="eyebrow">{order.code}</span><h2>{order.vehicle}</h2><p>{order.customer} · {order.plate}</p>
     <div className="order-summary"><div><span>Service</span><strong>{order.service}</strong></div><div><span>Assigned to</span><strong>{order.mechanic}</strong></div><div><span>Estimate</span><strong>{money(order.total)}</strong></div></div>
     <h3>Service stages</h3><div className="timeline">{steps.map((step, index) => <div className={index < current ? 'done' : ''} key={step}><span>{index < current ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index < current ? 'Completed' : 'Pending'}</small></p></div>)}</div>
-    <div className="modal-actions"><button className="secondary-btn"><MessageSquare /> Open chat</button><button className="primary-btn"><ClipboardCheck /> View repair order</button></div>
+    <div className="modal-actions"><button className="secondary-btn"><MessageSquare /> Open chat</button><button className="secondary-btn danger-btn" onClick={() => onCancel(order)}><X /> Cancel appointment</button><button className="primary-btn"><ClipboardCheck /> View repair order</button></div>
   </article></div>
 }
 
 function MetricDetailsModal({ type, orders, appointments, onClose }: { type: Exclude<MetricModal, null>; orders: ServiceOrder[]; appointments: DashboardAppointment[]; onClose: () => void }) {
-  const active = orders.filter(order => order.status !== 'Completed')
+  const active = orders.filter(order => order.status !== 'Completed' && order.status !== 'Cancelled')
   const approvals = orders.filter(order => order.status === 'Estimate')
   const revenue = orders.reduce((sum, order) => sum + order.total, 0)
   const averageTicket = orders.length ? revenue / orders.length : 0
@@ -98,7 +100,7 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [ordersError, setOrdersError] = useState('')
   const orders = useMemo(() => remoteOrders.filter(order => `${order.code} ${order.customer} ${order.vehicle} ${order.plate}`.toLowerCase().includes(query.toLowerCase())), [query, remoteOrders])
-  const activeOrders = orders.filter(order => order.status !== 'Completed').length
+  const activeOrders = orders.filter(order => order.status !== 'Completed' && order.status !== 'Cancelled').length
   const completedOrders = orders.filter(order => order.status === 'Completed').length
   const pendingEstimates = orders.filter(order => order.status === 'Estimate').length
   const revenue = orders.reduce((sum, order) => sum + order.total, 0)
@@ -108,6 +110,19 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
   ] as const
 
   function action(message: string) { setToast(message); setTimeout(() => setToast(''), 2600) }
+
+  async function cancelOrderAsOwner(order: ServiceOrder) {
+    if (!confirm(`Cancel appointment ${order.code} for ${order.customer}?`)) return
+    try {
+      await cancelRepairOrder(order.id, 'Cancelled by shop owner.')
+      setSelected(null)
+      setRemoteOrders(await fetchServiceOrders(profile))
+      await loadAppointmentsToday()
+      action('Appointment cancelled. Customer was notified.')
+    } catch (error) {
+      action(error instanceof Error ? error.message : 'Could not cancel appointment.')
+    }
+  }
 
   async function loadAppointmentsToday() {
     if (!supabase || !profile.workshopId) return
@@ -119,6 +134,7 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
       .eq('workshop_id', profile.workshopId)
       .gte('scheduled_at', start.toISOString())
       .lt('scheduled_at', end.toISOString())
+      .neq('status', 'cancelled')
       .order('scheduled_at')
     if (error) throw error
     setAppointmentsToday((data ?? []).map(item => {
@@ -229,9 +245,15 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `workshop_id=eq.${profile.workshopId}` }, refreshOwnerData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'workshops', filter: `id=eq.${profile.workshopId}` }, refreshOwnerData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `workshop_id=eq.${profile.workshopId}` }, refreshOwnerData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_orders', filter: `workshop_id=eq.${profile.workshopId}` }, refreshOwnerData)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.userId}` }, payload => {
+        const notification = payload.new as { title?: string; body?: string }
+        action(`${notification.title ?? 'Notification'}: ${notification.body ?? ''}`)
+        refreshOwnerData()
+      })
       .subscribe()
     return () => { client.removeChannel(channel) }
-  }, [profile.workshopId, ownerProfileOpen])
+  }, [profile.userId, profile.workshopId, ownerProfileOpen])
 
   return <div className="app-shell">
     <aside className={mobileMenu ? 'sidebar open' : 'sidebar'}>
@@ -268,7 +290,7 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
         </section>
       </div>
     </main>
-    {selected && <OrderModal order={selected} onClose={() => setSelected(null)} />}
+    {selected && <OrderModal order={selected} onClose={() => setSelected(null)} onCancel={cancelOrderAsOwner} />}
     {metricModal && <MetricDetailsModal type={metricModal} orders={orders} appointments={appointmentsToday} onClose={() => setMetricModal(null)} />}
     {ownerProfileOpen && <div className="modal-backdrop" onClick={() => setOwnerProfileOpen(false)}>
       <article className="modal owner-profile-modal" onClick={event => event.stopPropagation()}>

@@ -5,6 +5,7 @@ import { fetchServiceOrders } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
 import { workshopSchedulingConfig } from '../config/workshop'
 import { VEHICLES, findVehicleModel, vehicleImageForText } from '../lib/vehicles'
+import { cancelRepairOrder } from '../lib/cancellations'
 import type { ServiceOrder, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void }
@@ -25,8 +26,22 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
   const [toast, setToast] = useState('')
   const [status, setStatus] = useState('Evaluation')
   const [avatarUrl, setAvatarUrl] = useState(defaultMechanicAvatar)
-  const tasks = remoteOrders.filter(order => order.status !== 'Completed')
+  const tasks = remoteOrders.filter(order => order.status !== 'Completed' && order.status !== 'Cancelled')
   function action(text: string) { setToast(text); setTimeout(() => setToast(''), 2300) }
+
+  async function cancelSelectedOrder() {
+    if (!selected) return
+    if (!confirm(`Cancel service ${selected.code} for ${selected.customer}?`)) return
+    try {
+      await cancelRepairOrder(selected.id, 'Cancelled by mechanic.')
+      const items = await fetchServiceOrders(profile)
+      setRemoteOrders(items)
+      setSelected(items.find(order => order.status !== 'Completed' && order.status !== 'Cancelled') ?? null)
+      action('Service cancelled. Owner and customer were notified.')
+    } catch (error) {
+      action(error instanceof Error ? error.message : 'Could not cancel service.')
+    }
+  }
 
   async function changeOwnAvatar(file?: File) {
     if (!file || !profile.userId) return
@@ -56,7 +71,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
     if (!supabase || !profile.workshopId) return
     const loadOrders = () => fetchServiceOrders(profile).then(items => {
       setRemoteOrders(items)
-      setSelected(current => items.find(item => item.id === current?.id) ?? items[0] ?? null)
+      setSelected(current => items.find(item => item.id === current?.id && item.status !== 'Completed' && item.status !== 'Cancelled') ?? items.find(item => item.status !== 'Completed' && item.status !== 'Cancelled') ?? null)
     }).catch(() => undefined)
     loadOrders()
     const client = supabase
@@ -64,6 +79,11 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
       .channel(`mechanic-orders-${profile.userId}-${profile.workshopId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_orders', filter: `workshop_id=eq.${profile.workshopId}` }, loadOrders)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_assignments', filter: `workshop_id=eq.${profile.workshopId}` }, loadOrders)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.userId}` }, payload => {
+        const notification = payload.new as { title?: string; body?: string }
+        action(`${notification.title ?? 'Notification'}: ${notification.body ?? ''}`)
+        loadOrders()
+      })
       .subscribe()
     return () => { client.removeChannel(channel) }
   }, [profile.userId, profile.workshopId])
@@ -86,7 +106,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
           <div className="status-steps">{['Arrived','Evaluation','Waiting Approval','In Progress','Ready'].map((step, index) => <button key={step} className={status === step ? 'active' : index === 0 ? 'done' : ''} onClick={() => { setStatus(step); action(`Status updated: ${step}`) }}><span>{index === 0 ? <Check /> : index + 1}</span><small>{step}</small></button>)}</div>
           <label className="notes-label">Comments / notes<textarea defaultValue="Vehicle is under evaluation. Add service notes here." /></label>
           <div className="photo-strip"><button onClick={() => action('Camera ready to attach a photo.')}><Camera /><span>Add photo</span></button><span><Wrench /></span><span><Gauge /></span><span><Car /></span></div>
-          <button className="primary-btn full" onClick={() => action('Update sent to the customer.')}><Send /> Send update</button>
+          <div className="stacked-actions"><button className="primary-btn full" onClick={() => action('Update sent to the customer.')}><Send /> Send update</button><button className="secondary-btn danger-btn full" onClick={cancelSelectedOrder}>Cancel service</button></div>
         </section> : <section className="role-panel service-detail"><div className="empty">Waiting for the first customer appointment.</div></section>}
       </div>
     </main>
@@ -98,7 +118,7 @@ export function CustomerDashboard({ profile, onLogout }: Props) {
   const [toast, setToast] = useState('')
   const [view, setView] = useState<'home' | 'booking' | 'history'>('home')
   const [remoteOrders, setRemoteOrders] = useState<ServiceOrder[]>([])
-  const activeOrder = remoteOrders[0] ?? null
+  const activeOrder = remoteOrders.find(order => order.status !== 'Completed' && order.status !== 'Cancelled') ?? null
   function action(text: string) { setToast(text); setTimeout(() => setToast(''), 2300) }
 
   useEffect(() => {
@@ -110,6 +130,11 @@ export function CustomerDashboard({ profile, onLogout }: Props) {
       .channel(`customer-orders-${profile.userId}-${profile.workshopId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_orders', filter: `workshop_id=eq.${profile.workshopId}` }, loadOrders)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `workshop_id=eq.${profile.workshopId}` }, loadOrders)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.userId}` }, payload => {
+        const notification = payload.new as { title?: string; body?: string }
+        action(`${notification.title ?? 'Notification'}: ${notification.body ?? ''}`)
+        loadOrders()
+      })
       .subscribe()
     return () => { client.removeChannel(channel) }
   }, [profile.userId, profile.workshopId])
@@ -119,7 +144,7 @@ export function CustomerDashboard({ profile, onLogout }: Props) {
     <main className="role-content customer-content">
       <section className="customer-hero"><div><span className="eyebrow">WELCOME TO YOUR GARAGE</span><h1>Hello, {profile.name.split(' ')[0]}.</h1><p>Track your vehicle and schedule services without calling the shop.</p><button className="primary-btn" onClick={() => setView('booking')}><CalendarDays /> Schedule service</button></div><button type="button" className="vehicle-card vehicle-card-button" onClick={() => setView('booking')}><span className="vehicle-art">{activeOrder ? <OrderVehicleImage order={activeOrder} className="vehicle-art-image" /> : <Car />}</span><p><small>{activeOrder ? 'YOUR VEHICLE' : 'FIRST STEP'}</small><strong>{activeOrder?.vehicle ?? 'Add your vehicle'}</strong><span>{activeOrder ? `${activeOrder.plate} · ${activeOrder.status}` : 'Create an appointment to start testing'}</span></p><ChevronRight /></button></section>
       {view === 'booking' ? <Booking profile={profile} onBack={() => setView('home')} onConfirm={() => { setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} onBack={() => setView('home')} /> : <>
-        <section className="customer-grid"><article className="role-panel live-service">{activeOrder ? <><div className="role-panel-head"><div><span className="eyebrow">REAL-TIME SERVICE TRACKING</span><h2>{activeOrder.service}</h2><p>{activeOrder.code} · {activeOrder.vehicle}</p></div><span className="status green">{activeOrder.status}</span></div><div className="customer-timeline">{['Appointment created','Vehicle received','Checklist and diagnosis','Service in progress','Ready for pickup'].map((step,index) => <div className={index === 0 ? 'done' : ''} key={step}><span>{index === 0 ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index === 0 ? 'Now' : 'Pending'}</small></p></div>)}</div><div className="live-actions"><button className="secondary-btn" onClick={() => action('Repair order chat opened.')}><MessageCircle /> Message the shop</button><button className="primary-btn" onClick={() => action('Repair order details loaded.')}><FileText /> View details</button></div></> : <div className="empty">No service created yet. Click Schedule service to begin.</div>}</article>
+        <section className="customer-grid"><article className="role-panel live-service">{activeOrder ? <><div className="role-panel-head"><div><span className="eyebrow">REAL-TIME SERVICE TRACKING</span><h2>{activeOrder.service}</h2><p>{activeOrder.code} · {activeOrder.vehicle}</p></div><span className="status green">{activeOrder.status}</span></div><div className="customer-timeline">{['Appointment created','Vehicle received','Checklist and diagnosis','Service in progress','Ready for pickup'].map((step,index) => <div className={index === 0 ? 'done' : ''} key={step}><span>{index === 0 ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index === 0 ? 'Now' : 'Pending'}</small></p></div>)}</div><div className="live-actions"><button className="secondary-btn" onClick={() => action('Repair order chat opened.')}><MessageCircle /> Message the shop</button><button className="secondary-btn danger-btn" onClick={async () => { if (!confirm(`Cancel appointment ${activeOrder.code}?`)) return; try { await cancelRepairOrder(activeOrder.id, 'Cancelled by customer.'); setRemoteOrders(await fetchServiceOrders(profile)); action('Appointment cancelled. The shop was notified.') } catch (error) { action(error instanceof Error ? error.message : 'Could not cancel appointment.') } }}>Cancel appointment</button><button className="primary-btn" onClick={() => action('Repair order details loaded.')}><FileText /> View details</button></div></> : <div className="empty">No service created yet. Click Schedule service to begin.</div>}</article>
           <aside className="customer-side"><article className="role-panel estimate-card"><ReceiptText /><span>{activeOrder ? 'Repair order estimate' : 'No estimate'}</span><strong>{activeOrder ? activeOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '$0.00'}</strong><small>{activeOrder ? activeOrder.status : 'Waiting for first service'}</small><button onClick={() => action(activeOrder ? 'Estimate opened.' : 'No estimate created yet.')}>View estimate <ChevronRight /></button></article><article className="role-panel quick-card"><h2>Quick access</h2><button onClick={() => setView('history')}><History />Vehicle history<ChevronRight /></button><button onClick={() => action('Vehicle documents loaded.')}><ClipboardCheck />Documents and checklists<ChevronRight /></button><button onClick={() => action('Preferences opened.')}><Settings2 />Preferences<ChevronRight /></button></article></aside>
         </section>
         <section className="role-panel next-care"><div><span className="eyebrow">NEXT CARE</span><h2>{activeOrder ? 'Track the next service steps' : 'No service scheduled yet'}</h2><p>{activeOrder ? 'The shop updates the status in real time.' : 'Create the first appointment to start the vehicle history.'}</p></div><Gauge /><button className="secondary-btn" onClick={() => setView('booking')}>Schedule now</button></section>
