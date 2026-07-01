@@ -7,25 +7,25 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['jas-motors-logo.png'],
       manifest: {
-        name: 'JAS Motors - Gestão de Oficina',
+        name: 'JAS Motors - Workshop Management',
         short_name: 'JAS Motors',
-        description: 'Gestão completa para oficinas mecânicas',
+        description: 'Complete management system for auto repair shops',
         theme_color: '#05070a',
         background_color: '#05070a',
         display: 'standalone',
         start_url: '/',
-        icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }]
+        icons: [{ src: 'jas-motors-logo.png', sizes: '1024x1024', type: 'image/png', purpose: 'any maskable' }],
       },
       workbox: {
         navigateFallback: '/index.html',
         runtimeCaching: [{
           urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\//,
           handler: 'NetworkFirst',
-          options: { cacheName: 'supabase-api', networkTimeoutSeconds: 5 }
-        }]
-      }
-    })
-  ]
+          options: { cacheName: 'supabase-api', networkTimeoutSeconds: 5 },
+        }],
+      },
+    }),
+  ],
 })
