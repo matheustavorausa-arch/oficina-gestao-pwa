@@ -7,6 +7,8 @@ export interface VehicleModel {
   years: number[]
 }
 
+export const OTHER_VEHICLE_MAKE = 'Other'
+
 export const BODY_TYPE_IMAGE: Record<BodyType, string> = {
   sedan: '/cars/sedan.png',
   suv: '/cars/suv.png',
@@ -53,6 +55,15 @@ export const VEHICLES: VehicleModel[] = [
   { make: 'Subaru', model: 'Outback', bodyType: 'suv', years: recentYears() },
   { make: 'Subaru', model: 'Forester', bodyType: 'suv', years: recentYears() },
   { make: 'Mazda', model: 'CX-5', bodyType: 'suv', years: recentYears() },
+  { make: 'Mitsubishi', model: 'Outlander', bodyType: 'suv', years: recentYears() },
+  { make: 'Buick', model: 'Encore', bodyType: 'suv', years: recentYears() },
+  { make: 'Cadillac', model: 'Escalade', bodyType: 'suv', years: recentYears() },
+  { make: 'Lincoln', model: 'Navigator', bodyType: 'suv', years: recentYears() },
+  { make: 'Lexus', model: 'RX', bodyType: 'suv', years: recentYears() },
+  { make: 'Acura', model: 'MDX', bodyType: 'suv', years: recentYears() },
+  { make: 'Infiniti', model: 'QX60', bodyType: 'suv', years: recentYears() },
+  { make: 'Volvo', model: 'XC90', bodyType: 'suv', years: recentYears() },
+  { make: 'Porsche', model: 'Cayenne', bodyType: 'suv', years: recentYears() },
   { make: 'Tesla', model: 'Model Y', bodyType: 'suv', years: recentYears(2020) },
   { make: 'Toyota', model: 'Camry', bodyType: 'sedan', years: recentYears() },
   { make: 'Toyota', model: 'Corolla', bodyType: 'sedan', years: recentYears() },
@@ -66,6 +77,9 @@ export const VEHICLES: VehicleModel[] = [
   { make: 'BMW', model: '320i', bodyType: 'sedan', years: recentYears(2015, 2020) },
   { make: 'Mercedes-Benz', model: 'C-Class', bodyType: 'sedan', years: recentYears() },
   { make: 'Audi', model: 'A4', bodyType: 'sedan', years: recentYears() },
+  { make: 'Lexus', model: 'ES', bodyType: 'sedan', years: recentYears() },
+  { make: 'Acura', model: 'TLX', bodyType: 'sedan', years: recentYears() },
+  { make: 'Kia', model: 'K5', bodyType: 'sedan', years: recentYears() },
   { make: 'Tesla', model: 'Model 3', bodyType: 'sedan', years: recentYears(2018) },
   { make: 'Volkswagen', model: 'Golf', bodyType: 'hatchback', years: recentYears(2015, 2021) },
   { make: 'Mazda', model: 'Mazda3 Hatchback', bodyType: 'hatchback', years: recentYears() },
@@ -76,6 +90,11 @@ export const VEHICLES: VehicleModel[] = [
   { make: 'Honda', model: 'Odyssey', bodyType: 'minivan', years: recentYears() },
   { make: 'Chrysler', model: 'Pacifica', bodyType: 'minivan', years: recentYears() },
   { make: 'Toyota', model: 'Sienna', bodyType: 'minivan', years: recentYears() },
+]
+
+export const VEHICLE_MAKE_OPTIONS = [
+  ...Array.from(new Set(VEHICLES.map(vehicle => vehicle.make))).filter(make => make !== OTHER_VEHICLE_MAKE).sort(),
+  OTHER_VEHICLE_MAKE,
 ]
 
 export function vehicleImageForBodyType(bodyType?: string | null) {

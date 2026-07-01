@@ -4,7 +4,7 @@ import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '..
 import { fetchServiceOrders } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
 import { workshopSchedulingConfig } from '../config/workshop'
-import { VEHICLES, findVehicleModel, vehicleImageForText } from '../lib/vehicles'
+import { OTHER_VEHICLE_MAKE, VEHICLES, VEHICLE_MAKE_OPTIONS, findVehicleModel, vehicleImageForText } from '../lib/vehicles'
 import { cancelRepairOrder } from '../lib/cancellations'
 import { deleteCustomerVehicle, fetchCustomerVehicles, saveCustomerVehicle, type CustomerVehicle } from '../lib/customerVehicles'
 import { fetchCustomerProfile, updateCustomerProfile, type CustomerProfileSettings } from '../lib/customerProfile'
@@ -261,13 +261,13 @@ function VehicleForm({ vehicle, onCancel, onSaved }: { vehicle: CustomerVehicle 
   const [vehiclePlate, setVehiclePlate] = useState(vehicle?.plate ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const vehicleMakes = Array.from(new Set(VEHICLES.map(item => item.make))).sort()
+  const vehicleMakes = VEHICLE_MAKE_OPTIONS
   const modelOptions = VEHICLES.filter(item => item.make === selectedMake)
   const selectedVehicle = findVehicleModel(selectedMake, selectedModel)
 
   function changeVehicleMake(nextMake: string) {
     setSelectedMake(nextMake)
-    if (nextMake === 'Other') {
+    if (nextMake === OTHER_VEHICLE_MAKE) {
       setSelectedModel('Other model')
       return
     }
@@ -282,8 +282,8 @@ function VehicleForm({ vehicle, onCancel, onSaved }: { vehicle: CustomerVehicle 
     setError('')
     try {
       const otherParts = customVehicle.trim().split(/\s+/)
-      const make = selectedMake === 'Other' ? otherParts.shift() || 'Vehicle' : selectedMake
-      const model = selectedMake === 'Other' ? otherParts.join(' ') || 'Other model' : selectedModel
+      const make = selectedMake === OTHER_VEHICLE_MAKE ? otherParts.shift() || 'Vehicle' : selectedMake
+      const model = selectedMake === OTHER_VEHICLE_MAKE ? otherParts.join(' ') || 'Other model' : selectedModel
       await saveCustomerVehicle({
         id: vehicle?.id,
         make,
@@ -303,9 +303,9 @@ function VehicleForm({ vehicle, onCancel, onSaved }: { vehicle: CustomerVehicle 
   return <aside className="garage-form">
     <h2>{vehicle ? 'Edit vehicle' : 'Add vehicle'}</h2>
     <div className="booking-form">
-      <label>Make<select value={selectedMake} onChange={event => changeVehicleMake(event.target.value)}>{vehicleMakes.map(make => <option key={make}>{make}</option>)}<option value="Other">Other / I cannot find my car</option></select></label>
-      {selectedMake !== 'Other' && <label>Model<select value={selectedModel} onChange={event => setSelectedModel(event.target.value)}>{modelOptions.map(item => <option key={`${item.make}-${item.model}`} value={item.model}>{item.model}</option>)}</select></label>}
-      {selectedMake === 'Other' && <label className="wide">Make and model<input value={customVehicle} onChange={event => setCustomVehicle(event.target.value)} placeholder="Example: Dodge Charger" /></label>}
+      <label>Make<select value={selectedMake} onChange={event => changeVehicleMake(event.target.value)}>{vehicleMakes.map(make => <option key={make} value={make}>{make === OTHER_VEHICLE_MAKE ? 'Other / I cannot find my car' : make}</option>)}</select></label>
+      {selectedMake !== OTHER_VEHICLE_MAKE && <label>Model<select value={selectedModel} onChange={event => setSelectedModel(event.target.value)}>{modelOptions.map(item => <option key={`${item.make}-${item.model}`} value={item.model}>{item.model}</option>)}</select></label>}
+      {selectedMake === OTHER_VEHICLE_MAKE && <label className="wide">Make and model<input value={customVehicle} onChange={event => setCustomVehicle(event.target.value)} placeholder="Example: Dodge Charger" /></label>}
       <label>Year{selectedVehicle ? <select value={vehicleYear} onChange={event => setVehicleYear(event.target.value)}>{selectedVehicle.years.map(year => <option key={year}>{year}</option>)}</select> : <input type="number" min="1980" max="2030" value={vehicleYear} onChange={event => setVehicleYear(event.target.value)} />}</label>
       <label>Color<input value={vehicleColor} onChange={event => setVehicleColor(event.target.value)} placeholder="Black" /></label>
       <label className="wide">Plate<input value={vehiclePlate} onChange={event => setVehiclePlate(event.target.value.toUpperCase())} placeholder="ABC1234" /></label>
@@ -329,7 +329,7 @@ function Booking({ profile, vehicles, onBack, onConfirm }: { profile: UserProfil
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const vehicleMakes = Array.from(new Set(VEHICLES.map(vehicle => vehicle.make))).sort()
+  const vehicleMakes = VEHICLE_MAKE_OPTIONS
   const modelOptions = VEHICLES.filter(vehicle => vehicle.make === selectedMake)
   const selectedVehicle = findVehicleModel(selectedMake, selectedModel)
   const garageVehicle = vehicles.find(vehicle => vehicle.id === garageVehicleId)
@@ -340,7 +340,7 @@ function Booking({ profile, vehicles, onBack, onConfirm }: { profile: UserProfil
 
   function changeVehicleMake(nextMake: string) {
     setSelectedMake(nextMake)
-    if (nextMake === 'Other') {
+    if (nextMake === OTHER_VEHICLE_MAKE) {
       setSelectedModel('Other model')
       return
     }
@@ -364,8 +364,8 @@ function Booking({ profile, vehicles, onBack, onConfirm }: { profile: UserProfil
     }
 
     const otherParts = customVehicle.trim().split(/\s+/)
-    const make = garageVehicle ? garageVehicle.make : selectedMake === 'Other' ? otherParts.shift() || 'Vehicle' : selectedMake
-    const model = garageVehicle ? garageVehicle.model : selectedMake === 'Other' ? otherParts.join(' ') || 'Other model' : selectedModel
+    const make = garageVehicle ? garageVehicle.make : selectedMake === OTHER_VEHICLE_MAKE ? otherParts.shift() || 'Vehicle' : selectedMake
+    const model = garageVehicle ? garageVehicle.model : selectedMake === OTHER_VEHICLE_MAKE ? otherParts.join(' ') || 'Other model' : selectedModel
     const year = garageVehicle ? garageVehicle.year : Number(vehicleYear) || null
     const color = garageVehicle ? garageVehicle.color ?? '' : vehicleColor
     const plate = garageVehicle ? garageVehicle.plate : vehiclePlate
@@ -401,9 +401,9 @@ function Booking({ profile, vehicles, onBack, onConfirm }: { profile: UserProfil
     <div className="booking-form">
       {vehicles.length > 0 && <label className="wide">Saved vehicle<select value={garageVehicleId} onChange={event => setGarageVehicleId(event.target.value)}>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.make} {vehicle.model}{vehicle.year ? ` ${vehicle.year}` : ''} · {vehicle.plate}</option>)}<option value="">Add a different vehicle</option></select></label>}
       {garageVehicle && <div className="garage-selected wide"><img src={garageVehicle.imageUrl} alt={`${garageVehicle.make} ${garageVehicle.model}`} /><p><strong>{garageVehicle.make} {garageVehicle.model}</strong><span>{garageVehicle.year ?? 'Year not set'} · {garageVehicle.color || 'No color'} · {garageVehicle.plate}</span></p></div>}
-      {!garageVehicle && <><label>Make<select value={selectedMake} onChange={event => changeVehicleMake(event.target.value)}>{vehicleMakes.map(make => <option key={make}>{make}</option>)}<option value="Other">Other / I cannot find my car</option></select></label>
-      {selectedMake !== 'Other' && <label>Model<select value={selectedModel} onChange={event => changeVehicleModel(event.target.value)}>{modelOptions.map(vehicle => <option key={`${vehicle.make}-${vehicle.model}`} value={vehicle.model}>{vehicle.model}</option>)}</select></label>}
-      {selectedMake === 'Other' && <label className="wide">Make and model<input value={customVehicle} onChange={event => setCustomVehicle(event.target.value)} placeholder="Example: Dodge Charger" required /></label>}
+      {!garageVehicle && <><label>Make<select value={selectedMake} onChange={event => changeVehicleMake(event.target.value)}>{vehicleMakes.map(make => <option key={make} value={make}>{make === OTHER_VEHICLE_MAKE ? 'Other / I cannot find my car' : make}</option>)}</select></label>
+      {selectedMake !== OTHER_VEHICLE_MAKE && <label>Model<select value={selectedModel} onChange={event => changeVehicleModel(event.target.value)}>{modelOptions.map(vehicle => <option key={`${vehicle.make}-${vehicle.model}`} value={vehicle.model}>{vehicle.model}</option>)}</select></label>}
+      {selectedMake === OTHER_VEHICLE_MAKE && <label className="wide">Make and model<input value={customVehicle} onChange={event => setCustomVehicle(event.target.value)} placeholder="Example: Dodge Charger" required /></label>}
       <label>Year{selectedVehicle ? <select value={vehicleYear} onChange={event => setVehicleYear(event.target.value)}>{selectedVehicle.years.map(year => <option key={year}>{year}</option>)}</select> : <input type="number" min="1980" max="2030" value={vehicleYear} onChange={event => setVehicleYear(event.target.value)} />}</label>
       <label>Color<input value={vehicleColor} onChange={event => setVehicleColor(event.target.value)} placeholder="Black" /></label>
       <label>Plate<input value={vehiclePlate} onChange={event => setVehiclePlate(event.target.value.toUpperCase())} placeholder="ABC1234" /></label></>}
