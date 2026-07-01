@@ -81,6 +81,7 @@ export async function fetchServiceOrders(profile: UserProfile): Promise<ServiceO
     .from('estimates')
     .select('service_order_id, total, status')
     .in('service_order_id', orderIds)
+    .order('version', { ascending: true })
 
   const mechanicById = new Map((mechanics ?? []).map(item => [item.id, item.full_name]))
   const assignmentByOrder = new Map((assignments ?? []).map(item => [item.service_order_id, item.mechanic_id]))

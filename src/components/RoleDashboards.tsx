@@ -9,6 +9,7 @@ import { cancelRepairOrder } from '../lib/cancellations'
 import { deleteCustomerVehicle, fetchCustomerVehicles, saveCustomerVehicle, type CustomerVehicle } from '../lib/customerVehicles'
 import { fetchCustomerProfile, updateCustomerProfile, type CustomerProfileSettings } from '../lib/customerProfile'
 import { fetchOrderChatMessages, sendOrderChatMessage, uploadOrderChatPhoto, type OrderChatMessage } from '../lib/orderChat'
+import { decideEstimate, fetchLatestEstimate, sendRepairEstimate, type EstimateItemInput, type RepairEstimate } from '../lib/estimates'
 import type { ServiceOrder, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
@@ -29,7 +30,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
   const [toast, setToast] = useState('')
   const [status, setStatus] = useState('Evaluation')
   const [avatarUrl, setAvatarUrl] = useState(defaultMechanicAvatar)
-  const [view, setView] = useState<'services' | 'chat'>('services')
+  const [view, setView] = useState<'services' | 'chat' | 'estimate'>('services')
   const tasks = remoteOrders.filter(order => order.status !== 'Completed' && order.status !== 'Cancelled')
   function action(text: string) { setToast(text); setTimeout(() => setToast(''), 2300) }
 
@@ -96,7 +97,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
   return <div className="role-app mechanic-app">
     <RoleHeader profile={profile} onLogout={onLogout} title="Mechanic Area" />
     <main className="role-content">
-      {view === 'chat' ? <OrderChatView profile={profile} orders={tasks} activeOrder={selected} audience="staff" onBack={() => setView('services')} /> : <>
+      {view === 'chat' ? <OrderChatView profile={profile} orders={tasks} activeOrder={selected} audience="staff" onBack={() => setView('services')} /> : view === 'estimate' && selected ? <EstimateComposer order={selected} onBack={() => setView('services')} onSent={async () => { const items = await fetchServiceOrders(profile); setRemoteOrders(items); setSelected(items.find(item => item.id === selected.id) ?? selected); setView('services'); action('Estimate sent to the customer.') }} /> : <>
       <section className="role-welcome">
         <div className="mechanic-profile-hero">
           <label className="mechanic-self-avatar"><img src={avatarUrl} alt={profile.name} /><input type="file" accept="image/*" onChange={event => changeOwnAvatar(event.target.files?.[0])} /><span>Change photo</span></label>
@@ -112,7 +113,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
           <div className="status-steps">{['Arrived','Evaluation','Waiting Approval','In Progress','Ready'].map((step, index) => <button key={step} className={status === step ? 'active' : index === 0 ? 'done' : ''} onClick={() => { setStatus(step); action(`Status updated: ${step}`) }}><span>{index === 0 ? <Check /> : index + 1}</span><small>{step}</small></button>)}</div>
           <label className="notes-label">Comments / notes<textarea defaultValue="Vehicle is under evaluation. Add service notes here." /></label>
           <div className="photo-strip"><button onClick={() => action('Camera ready to attach a photo.')}><Camera /><span>Add photo</span></button><span><Wrench /></span><span><Gauge /></span><span><Car /></span></div>
-          <div className="stacked-actions"><button className="primary-btn full" onClick={() => action('Update sent to the customer.')}><Send /> Send update</button><button className="secondary-btn full" onClick={() => setView('chat')}><MessageCircle /> Chat with customer</button><button className="secondary-btn danger-btn full" onClick={cancelSelectedOrder}>Cancel service</button></div>
+          <div className="stacked-actions"><button className="primary-btn full" onClick={() => action('Update sent to the customer.')}><Send /> Send update</button><button className="secondary-btn full" onClick={() => setView('estimate')}><ReceiptText /> Send estimate</button><button className="secondary-btn full" onClick={() => setView('chat')}><MessageCircle /> Chat with customer</button><button className="secondary-btn danger-btn full" onClick={cancelSelectedOrder}>Cancel service</button></div>
         </section> : <section className="role-panel service-detail"><div className="empty">Waiting for the first customer appointment.</div></section>}
       </div>
       </>}
@@ -123,7 +124,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
 
 export function CustomerDashboard({ profile, onLogout, onProfileChange }: Props) {
   const [toast, setToast] = useState('')
-  const [view, setView] = useState<'home' | 'booking' | 'history' | 'vehicles' | 'profile' | 'messages'>('home')
+  const [view, setView] = useState<'home' | 'booking' | 'history' | 'vehicles' | 'profile' | 'messages' | 'estimate'>('home')
   const [remoteOrders, setRemoteOrders] = useState<ServiceOrder[]>([])
   const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([])
   const [customerSettings, setCustomerSettings] = useState<CustomerProfileSettings | null>(null)
@@ -159,15 +160,121 @@ export function CustomerDashboard({ profile, onLogout, onProfileChange }: Props)
     <RoleHeader profile={profile} onLogout={onLogout} title="Customer Area" />
     <main className="role-content customer-content">
       <section className="customer-hero"><div><span className="eyebrow">WELCOME TO YOUR GARAGE</span><h1>Hello, {profile.name.split(' ')[0]}.</h1><p>Track your vehicle and schedule services without calling the shop.</p><button className="primary-btn" onClick={() => setView('booking')}><CalendarDays /> Schedule service</button></div><button type="button" className="vehicle-card vehicle-card-button" onClick={() => setView('vehicles')}><span className="vehicle-art">{activeOrder ? <OrderVehicleImage order={activeOrder} className="vehicle-art-image" /> : customerVehicles[0] ? <img className="vehicle-art-image" src={customerVehicles[0].imageUrl} alt={`${customerVehicles[0].make} ${customerVehicles[0].model}`} /> : <Car />}</span><p><small>{activeOrder ? 'ACTIVE VEHICLE' : customerVehicles.length ? 'MY GARAGE' : 'FIRST STEP'}</small><strong>{activeOrder?.vehicle ?? (customerVehicles[0] ? `${customerVehicles[0].make} ${customerVehicles[0].model}` : 'Add your vehicle')}</strong><span>{activeOrder ? `${activeOrder.plate} · ${activeOrder.status}` : customerVehicles.length ? `${customerVehicles.length} vehicle${customerVehicles.length === 1 ? '' : 's'} saved` : 'Create your garage before scheduling'}</span></p><ChevronRight /></button></section>
-      {view === 'booking' ? <Booking profile={profile} vehicles={customerVehicles} onBack={() => setView('home')} onConfirm={() => { loadCustomerVehicles(); setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} vehicles={customerVehicles} onBack={() => setView('home')} onSchedule={() => setView('booking')} /> : view === 'vehicles' ? <MyVehicles vehicles={customerVehicles} onBack={() => setView('home')} onChanged={async message => { await loadCustomerVehicles(); action(message) }} /> : view === 'profile' ? <CustomerProfileView profile={profile} settings={customerSettings} onBack={() => setView('home')} onSaved={settings => { setCustomerSettings(settings); onProfileChange?.({ ...profile, name: settings.fullName || profile.name }); action('Profile updated.') }} /> : view === 'messages' ? <OrderChatView profile={profile} orders={remoteOrders} activeOrder={activeOrder} onBack={() => setView('home')} onSchedule={() => setView('booking')} /> : <>
+      {view === 'booking' ? <Booking profile={profile} vehicles={customerVehicles} onBack={() => setView('home')} onConfirm={() => { loadCustomerVehicles(); setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} vehicles={customerVehicles} onBack={() => setView('home')} onSchedule={() => setView('booking')} /> : view === 'vehicles' ? <MyVehicles vehicles={customerVehicles} onBack={() => setView('home')} onChanged={async message => { await loadCustomerVehicles(); action(message) }} /> : view === 'profile' ? <CustomerProfileView profile={profile} settings={customerSettings} onBack={() => setView('home')} onSaved={settings => { setCustomerSettings(settings); onProfileChange?.({ ...profile, name: settings.fullName || profile.name }); action('Profile updated.') }} /> : view === 'messages' ? <OrderChatView profile={profile} orders={remoteOrders} activeOrder={activeOrder} onBack={() => setView('home')} onSchedule={() => setView('booking')} /> : view === 'estimate' && activeOrder ? <EstimateDecisionView order={activeOrder} onBack={() => setView('home')} onDecided={async message => { setRemoteOrders(await fetchServiceOrders(profile)); setView('home'); action(message) }} /> : <>
         <section className="customer-grid"><article className="role-panel live-service">{activeOrder ? <><div className="role-panel-head"><div><span className="eyebrow">REAL-TIME SERVICE TRACKING</span><h2>{activeOrder.service}</h2><p>{activeOrder.code} · {activeOrder.vehicle}</p></div><span className="status green">{activeOrder.status}</span></div><div className="customer-timeline">{['Appointment created','Vehicle received','Checklist and diagnosis','Service in progress','Ready for pickup'].map((step,index) => <div className={index === 0 ? 'done' : ''} key={step}><span>{index === 0 ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index === 0 ? 'Now' : 'Pending'}</small></p></div>)}</div><div className="live-actions"><button className="secondary-btn" onClick={() => setView('messages')}><MessageCircle /> Message the shop</button><button className="secondary-btn danger-btn" onClick={async () => { if (!confirm(`Cancel appointment ${activeOrder.code}?`)) return; try { await cancelRepairOrder(activeOrder.id, 'Cancelled by customer.'); setRemoteOrders(await fetchServiceOrders(profile)); action('Appointment cancelled. The shop was notified.') } catch (error) { action(error instanceof Error ? error.message : 'Could not cancel appointment.') } }}>Cancel appointment</button><button className="primary-btn" onClick={() => action('Repair order details loaded.')}><FileText /> View details</button></div></> : <div className="empty">No service created yet. Click Schedule service to begin.</div>}</article>
-          <aside className="customer-side"><article className="role-panel estimate-card"><ReceiptText /><span>{activeOrder ? 'Repair order estimate' : 'No estimate'}</span><strong>{activeOrder ? activeOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '$0.00'}</strong><small>{activeOrder ? activeOrder.status : 'Waiting for first service'}</small><button onClick={() => action(activeOrder ? 'Estimate opened.' : 'No estimate created yet.')}>View estimate <ChevronRight /></button></article><article className="role-panel quick-card"><h2>Quick access</h2><button onClick={() => setView('vehicles')}><Car />My vehicles<ChevronRight /></button><button onClick={() => setView('history')}><History />Vehicle history<ChevronRight /></button><button onClick={() => action('Vehicle documents loaded.')}><ClipboardCheck />Documents and checklists<ChevronRight /></button><button onClick={() => setView('profile')}><Settings2 />Profile settings<ChevronRight /></button></article></aside>
+          <aside className="customer-side"><article className="role-panel estimate-card"><ReceiptText /><span>{activeOrder ? 'Repair order estimate' : 'No estimate'}</span><strong>{activeOrder ? activeOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '$0.00'}</strong><small>{activeOrder ? activeOrder.status : 'Waiting for first service'}</small><button onClick={() => activeOrder ? setView('estimate') : action('No estimate created yet.')}>View estimate <ChevronRight /></button></article><article className="role-panel quick-card"><h2>Quick access</h2><button onClick={() => setView('vehicles')}><Car />My vehicles<ChevronRight /></button><button onClick={() => setView('history')}><History />Vehicle history<ChevronRight /></button><button onClick={() => action('Vehicle documents loaded.')}><ClipboardCheck />Documents and checklists<ChevronRight /></button><button onClick={() => setView('profile')}><Settings2 />Profile settings<ChevronRight /></button></article></aside>
         </section>
         <section className="role-panel next-care"><div><span className="eyebrow">NEXT CARE</span><h2>{activeOrder ? 'Track the next service steps' : 'No service scheduled yet'}</h2><p>{activeOrder ? 'The shop updates the status in real time.' : 'Create the first appointment to start the vehicle history.'}</p></div><Gauge /><button className="secondary-btn" onClick={() => setView('booking')}>Schedule now</button></section>
       </>}
     </main>
     <nav className="role-bottom-nav"><button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}><Home />Home</button><button className={view === 'booking' ? 'active' : ''} onClick={() => setView('booking')}><CalendarDays />Schedule</button><button className={view === 'vehicles' ? 'active' : ''} onClick={() => setView('vehicles')}><Car />Vehicles</button><button className={view === 'messages' ? 'active' : ''} onClick={() => setView('messages')}><MessageCircle />Messages</button><button className={view === 'profile' ? 'active' : ''} onClick={() => setView('profile')}><UserRound />Profile</button></nav><Toast text={toast} />
   </div>
+}
+
+function EstimateComposer({ order, onBack, onSent }: { order: ServiceOrder; onBack: () => void; onSent: () => Promise<void> }) {
+  const [items, setItems] = useState<EstimateItemInput[]>([
+    { kind: 'part', description: 'Parts', quantity: 1, unitPrice: 0 },
+    { kind: 'labor', description: 'Labor', quantity: 1, unitPrice: 0 },
+  ])
+  const [notes, setNotes] = useState('')
+  const [discount, setDiscount] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0)
+  const total = Math.max(0, subtotal - (Number(discount) || 0))
+
+  function updateItem(index: number, patch: Partial<EstimateItemInput>) {
+    setItems(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item))
+  }
+
+  async function submitEstimate() {
+    setSaving(true)
+    setError('')
+    try {
+      const cleanItems = items
+        .map(item => ({ ...item, description: item.description.trim(), quantity: Number(item.quantity) || 1, unitPrice: Number(item.unitPrice) || 0 }))
+        .filter(item => item.description && item.unitPrice > 0)
+      await sendRepairEstimate({ serviceOrderId: order.id, items: cleanItems, notes, discount })
+      await onSent()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not send estimate.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <section className="role-panel estimate-composer">
+    <button className="back-link" onClick={onBack}>Back</button>
+    <span className="eyebrow">SEND ESTIMATE</span>
+    <h1>{order.vehicle}</h1>
+    <p>{order.code} · {order.customer} · {order.service}</p>
+    <div className="estimate-line-items">
+      {items.map((item, index) => <article key={index} className="estimate-line-item">
+        <label>Type<select value={item.kind} onChange={event => updateItem(index, { kind: event.target.value as EstimateItemInput['kind'] })}><option value="part">Part</option><option value="labor">Labor</option><option value="other">Other</option></select></label>
+        <label className="wide">Description<input value={item.description} onChange={event => updateItem(index, { description: event.target.value })} placeholder="Brake pads, diagnostic labor..." /></label>
+        <label>Qty<input type="number" min="0.01" step="0.01" value={item.quantity} onChange={event => updateItem(index, { quantity: Number(event.target.value) })} /></label>
+        <label>Unit price<input type="number" min="0" step="0.01" value={item.unitPrice} onChange={event => updateItem(index, { unitPrice: Number(event.target.value) })} /></label>
+        <button className="secondary-btn danger-btn" onClick={() => setItems(current => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button>
+      </article>)}
+    </div>
+    <button className="secondary-btn" onClick={() => setItems(current => [...current, { kind: 'other', description: '', quantity: 1, unitPrice: 0 }])}><Plus /> Add item</button>
+    <div className="booking-form estimate-notes">
+      <label className="wide">Notes<textarea value={notes} onChange={event => setNotes(event.target.value)} placeholder="Explain what is included in this estimate..." /></label>
+      <label>Discount<input type="number" min="0" step="0.01" value={discount} onChange={event => setDiscount(Number(event.target.value))} /></label>
+    </div>
+    <div className="estimate-total-box"><span>Subtotal <strong>{subtotal.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong></span><span>Total <strong>{total.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong></span></div>
+    {error && <div className="form-message">{error}</div>}
+    <div className="modal-actions"><button className="secondary-btn" onClick={onBack}>Cancel</button><button className="primary-btn" disabled={saving || total <= 0} onClick={submitEstimate}>{saving ? 'Sending...' : 'Send estimate to customer'}</button></div>
+  </section>
+}
+
+function EstimateDecisionView({ order, onBack, onDecided }: { order: ServiceOrder; onBack: () => void; onDecided: (message: string) => Promise<void> }) {
+  const [estimate, setEstimate] = useState<RepairEstimate | null>(null)
+  const [note, setNote] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let ignore = false
+    setLoading(true)
+    fetchLatestEstimate(order.id)
+      .then(item => { if (!ignore) setEstimate(item) })
+      .catch(error => { if (!ignore) setError(error.message ?? 'Could not load estimate.') })
+      .finally(() => { if (!ignore) setLoading(false) })
+    return () => { ignore = true }
+  }, [order.id])
+
+  async function decide(approve: boolean) {
+    if (!estimate) return
+    setSaving(true)
+    setError('')
+    try {
+      await decideEstimate(estimate.id, approve, note)
+      await onDecided(approve ? 'Estimate approved. The shop was notified.' : 'Estimate rejected. The shop was notified.')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not update estimate.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <section className="role-panel estimate-decision">
+    <button className="back-link" onClick={onBack}>Back</button>
+    <span className="eyebrow">REPAIR ESTIMATE</span>
+    <h1>{order.vehicle}</h1>
+    <p>{order.code} · {order.service}</p>
+    {loading && <div className="empty">Loading estimate...</div>}
+    {!loading && !estimate && <div className="empty">No estimate has been sent yet.</div>}
+    {estimate && <>
+      <div className="estimate-review-head"><span className={`status ${estimate.status === 'approved' ? 'green' : estimate.status === 'rejected' ? 'gray' : 'amber'}`}>{estimate.status}</span><strong>{estimate.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong></div>
+      <div className="estimate-review-items">{estimate.items.map(item => <article key={item.id}><div><strong>{item.description}</strong><span>{item.kind} · Qty {item.quantity}</span></div><span>{item.unitPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span><strong>{item.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong></article>)}</div>
+      <div className="estimate-total-box"><span>Subtotal <strong>{estimate.subtotal.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong></span><span>Discount <strong>{estimate.discount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong></span><span>Total <strong>{estimate.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong></span></div>
+      {estimate.notes && <article className="estimate-notes-card"><h3>Shop notes</h3><p>{estimate.notes}</p></article>}
+      {estimate.status === 'sent' ? <><label className="notes-label estimate-decision-note">Decision note<textarea value={note} onChange={event => setNote(event.target.value)} placeholder="Optional message to the shop..." /></label><div className="modal-actions"><button className="secondary-btn danger-btn" disabled={saving} onClick={() => decide(false)}>Reject estimate</button><button className="primary-btn" disabled={saving} onClick={() => decide(true)}>{saving ? 'Saving...' : 'Approve estimate'}</button></div></> : <div className="form-message">This estimate was already {estimate.status}.</div>}
+    </>}
+    {error && <div className="form-message">{error}</div>}
+  </section>
 }
 
 function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule, audience = 'customer' }: { profile: UserProfile; orders: ServiceOrder[]; activeOrder: ServiceOrder | null; onBack: () => void; onSchedule?: () => void; audience?: 'customer' | 'staff' }) {
