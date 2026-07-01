@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, CalendarDays, Car, Check, ChevronRight, CircleDollarSign, ClipboardCheck, FileText, LayoutDashboard, Menu, MessageSquare, Settings, Users, Wrench, X } from 'lucide-react'
+import { Bell, CalendarDays, Camera, Car, Check, ChevronRight, CircleDollarSign, ClipboardCheck, FileText, LayoutDashboard, Menu, MessageSquare, Settings, Users, Wrench, X } from 'lucide-react'
 import { fetchServiceOrders } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
 import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '../lib/avatars'
 import { vehicleImageForText } from '../lib/vehicles'
 import { cancelRepairOrder } from '../lib/cancellations'
+import { fetchOrderChatMessages, sendOrderChatMessage, uploadOrderChatPhoto, type OrderChatMessage } from '../lib/orderChat'
 import type { ServiceOrder, ServiceStatus, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
@@ -32,7 +33,7 @@ function money(value: number) {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
 
-function OrderModal({ order, onClose, onCancel }: { order: ServiceOrder; onClose: () => void; onCancel: (order: ServiceOrder) => void }) {
+function OrderModal({ order, onClose, onCancel, onOpenChat }: { order: ServiceOrder; onClose: () => void; onCancel: (order: ServiceOrder) => void; onOpenChat: (order: ServiceOrder) => void }) {
   const steps = ['Vehicle intake', 'Initial checklist', 'Diagnosis', 'Estimate approval', 'Repair in progress', 'Delivery']
   const current = Math.max(1, Math.ceil(order.progress / 17))
   return <div className="modal-backdrop" onClick={onClose}><article className="modal" onClick={event => event.stopPropagation()}>
@@ -41,7 +42,7 @@ function OrderModal({ order, onClose, onCancel }: { order: ServiceOrder; onClose
     <span className="eyebrow">{order.code}</span><h2>{order.vehicle}</h2><p>{order.customer} · {order.plate}</p>
     <div className="order-summary"><div><span>Service</span><strong>{order.service}</strong></div><div><span>Assigned to</span><strong>{order.mechanic}</strong></div><div><span>Estimate</span><strong>{money(order.total)}</strong></div></div>
     <h3>Service stages</h3><div className="timeline">{steps.map((step, index) => <div className={index < current ? 'done' : ''} key={step}><span>{index < current ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index < current ? 'Completed' : 'Pending'}</small></p></div>)}</div>
-    <div className="modal-actions"><button className="secondary-btn"><MessageSquare /> Open chat</button><button className="secondary-btn danger-btn" onClick={() => onCancel(order)}><X /> Cancel appointment</button><button className="primary-btn"><ClipboardCheck /> View repair order</button></div>
+    <div className="modal-actions"><button className="secondary-btn" onClick={() => onOpenChat(order)}><MessageSquare /> Open chat</button><button className="secondary-btn danger-btn" onClick={() => onCancel(order)}><X /> Cancel appointment</button><button className="primary-btn"><ClipboardCheck /> View repair order</button></div>
   </article></div>
 }
 
@@ -83,10 +84,117 @@ function MetricDetailsModal({ type, orders, appointments, onClose }: { type: Exc
   </div>
 }
 
+function OwnerChatModal({ profile, order, orders, onClose }: { profile: UserProfile; order: ServiceOrder; orders: ServiceOrder[]; onClose: () => void }) {
+  const chatOrders = orders.filter(item => item.status !== 'Cancelled')
+  const [selectedOrderId, setSelectedOrderId] = useState(order.id)
+  const [messages, setMessages] = useState<OrderChatMessage[]>([])
+  const [draft, setDraft] = useState('')
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+  const selectedOrder = chatOrders.find(item => item.id === selectedOrderId) ?? order
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreview('')
+      return
+    }
+    const nextPreview = URL.createObjectURL(photoFile)
+    setPhotoPreview(nextPreview)
+    return () => URL.revokeObjectURL(nextPreview)
+  }, [photoFile])
+
+  useEffect(() => {
+    if (!supabase || !selectedOrderId) return
+    let ignore = false
+    const loadMessages = () => {
+      setLoading(true)
+      fetchOrderChatMessages(selectedOrderId, profile.userId)
+        .then(items => { if (!ignore) setMessages(items) })
+        .catch(error => { if (!ignore) setError(error.message ?? 'Could not load messages.') })
+        .finally(() => { if (!ignore) setLoading(false) })
+    }
+    loadMessages()
+    const client = supabase
+    const channel = client
+      .channel(`owner-order-chat-${selectedOrderId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages', filter: `service_order_id=eq.${selectedOrderId}` }, loadMessages)
+      .subscribe()
+    return () => {
+      ignore = true
+      client.removeChannel(channel)
+    }
+  }, [selectedOrderId, profile.userId])
+
+  async function sendMessage() {
+    const body = draft.trim()
+    if (!selectedOrder || (!body && !photoFile)) return
+    if (photoFile && !profile.userId) {
+      setError('User profile is not ready for photo upload.')
+      return
+    }
+    setSending(true)
+    setError('')
+    try {
+      const attachmentPath = photoFile ? await uploadOrderChatPhoto(selectedOrder.id, profile.userId!, photoFile) : null
+      await sendOrderChatMessage(selectedOrder.id, body || 'Photo', attachmentPath)
+      setDraft('')
+      setPhotoFile(null)
+      setMessages(await fetchOrderChatMessages(selectedOrder.id, profile.userId))
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not send message.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return <div className="modal-backdrop" onClick={onClose}>
+    <article className="modal owner-chat-modal" onClick={event => event.stopPropagation()}>
+      <button className="icon-btn modal-close" onClick={onClose}><X /></button>
+      <span className="eyebrow">OWNER CHAT</span>
+      <h2>Repair order messages</h2>
+      <p>Reply as the shop owner. This conversation stays attached to the selected repair order.</p>
+      <div className="chat-layout owner-chat-layout">
+        <aside className="chat-orders">
+          {chatOrders.map(item => <button key={item.id} className={selectedOrderId === item.id ? 'active' : ''} onClick={() => setSelectedOrderId(item.id)}>
+            <VehicleThumb order={item} />
+            <span><strong>{item.code}</strong><small>{item.customer} · {item.vehicle}</small></span>
+          </button>)}
+        </aside>
+        <div className="chat-panel">
+          <div className="chat-title"><VehicleThumb order={selectedOrder} /><div><strong>{selectedOrder.customer}</strong><span>{selectedOrder.code} · {selectedOrder.vehicle} · {selectedOrder.plate}</span></div></div>
+          <div className="chat-messages">
+            {loading && <div className="empty">Loading messages...</div>}
+            {!loading && messages.map(message => <div key={message.id} className={message.isMine ? 'chat-row mine' : 'chat-row'}>
+              <span className={message.isMine ? 'chat-avatar shop' : 'chat-avatar customer'}><img src={message.isMine ? '/jas-motors-logo.png' : '/customer-avatar.svg'} alt={message.isMine ? 'Owner' : 'Customer'} /></span>
+              <article className={message.isMine ? 'chat-bubble mine' : 'chat-bubble'}>
+                <small>{message.isMine ? 'Owner' : 'Customer'} · {new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(message.createdAt))}</small>
+                {message.attachmentUrl && <a href={message.attachmentUrl} target="_blank" rel="noreferrer"><img className="chat-photo" src={message.attachmentUrl} alt="Chat attachment" /></a>}
+                <p>{message.body}</p>
+              </article>
+            </div>)}
+            {!loading && messages.length === 0 && <div className="empty">No messages yet. Send the first message to this customer.</div>}
+          </div>
+          {error && <div className="form-message">{error}</div>}
+          {photoPreview && <div className="chat-photo-preview"><img src={photoPreview} alt="Selected attachment" /><span>{photoFile?.name}</span><button className="secondary-btn" onClick={() => setPhotoFile(null)}>Remove</button></div>}
+          <div className="chat-composer">
+            <label className="chat-photo-button"><Camera /><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setPhotoFile(event.target.files?.[0] ?? null)} /></label>
+            <textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Type your message to the customer..." onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage() } }} />
+            <button className="primary-btn" disabled={sending || (!draft.trim() && !photoFile)} onClick={sendMessage}>{sending ? 'Sending...' : 'Send'}</button>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+}
+
 export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
   const [active, setActive] = useState('Overview')
   const [mobileMenu, setMobileMenu] = useState(false)
   const [selected, setSelected] = useState<ServiceOrder | null>(null)
+  const [chatOrder, setChatOrder] = useState<ServiceOrder | null>(null)
   const [metricModal, setMetricModal] = useState<MetricModal>(null)
   const [ownerProfileOpen, setOwnerProfileOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -116,6 +224,7 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
     try {
       await cancelRepairOrder(order.id, 'Cancelled by shop owner.')
       setSelected(null)
+      setChatOrder(null)
       setRemoteOrders(await fetchServiceOrders(profile))
       await loadAppointmentsToday()
       action('Appointment cancelled. Customer was notified.')
@@ -290,7 +399,8 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
         </section>
       </div>
     </main>
-    {selected && <OrderModal order={selected} onClose={() => setSelected(null)} onCancel={cancelOrderAsOwner} />}
+    {selected && <OrderModal order={selected} onClose={() => setSelected(null)} onCancel={cancelOrderAsOwner} onOpenChat={order => { setSelected(null); setChatOrder(order) }} />}
+    {chatOrder && <OwnerChatModal profile={profile} order={chatOrder} orders={orders} onClose={() => setChatOrder(null)} />}
     {metricModal && <MetricDetailsModal type={metricModal} orders={orders} appointments={appointmentsToday} onClose={() => setMetricModal(null)} />}
     {ownerProfileOpen && <div className="modal-backdrop" onClick={() => setOwnerProfileOpen(false)}>
       <article className="modal owner-profile-modal" onClick={event => event.stopPropagation()}>
