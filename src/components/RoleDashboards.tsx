@@ -154,7 +154,7 @@ export function CustomerDashboard({ profile, onLogout, onProfileChange }: Props)
     <RoleHeader profile={profile} onLogout={onLogout} title="Customer Area" />
     <main className="role-content customer-content">
       <section className="customer-hero"><div><span className="eyebrow">WELCOME TO YOUR GARAGE</span><h1>Hello, {profile.name.split(' ')[0]}.</h1><p>Track your vehicle and schedule services without calling the shop.</p><button className="primary-btn" onClick={() => setView('booking')}><CalendarDays /> Schedule service</button></div><button type="button" className="vehicle-card vehicle-card-button" onClick={() => setView('vehicles')}><span className="vehicle-art">{activeOrder ? <OrderVehicleImage order={activeOrder} className="vehicle-art-image" /> : customerVehicles[0] ? <img className="vehicle-art-image" src={customerVehicles[0].imageUrl} alt={`${customerVehicles[0].make} ${customerVehicles[0].model}`} /> : <Car />}</span><p><small>{activeOrder ? 'ACTIVE VEHICLE' : customerVehicles.length ? 'MY GARAGE' : 'FIRST STEP'}</small><strong>{activeOrder?.vehicle ?? (customerVehicles[0] ? `${customerVehicles[0].make} ${customerVehicles[0].model}` : 'Add your vehicle')}</strong><span>{activeOrder ? `${activeOrder.plate} · ${activeOrder.status}` : customerVehicles.length ? `${customerVehicles.length} vehicle${customerVehicles.length === 1 ? '' : 's'} saved` : 'Create your garage before scheduling'}</span></p><ChevronRight /></button></section>
-      {view === 'booking' ? <Booking profile={profile} vehicles={customerVehicles} onBack={() => setView('home')} onConfirm={() => { loadCustomerVehicles(); setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} onBack={() => setView('home')} /> : view === 'vehicles' ? <MyVehicles vehicles={customerVehicles} onBack={() => setView('home')} onChanged={async message => { await loadCustomerVehicles(); action(message) }} /> : view === 'profile' ? <CustomerProfileView profile={profile} settings={customerSettings} onBack={() => setView('home')} onSaved={settings => { setCustomerSettings(settings); onProfileChange?.({ ...profile, name: settings.fullName || profile.name }); action('Profile updated.') }} /> : <>
+      {view === 'booking' ? <Booking profile={profile} vehicles={customerVehicles} onBack={() => setView('home')} onConfirm={() => { loadCustomerVehicles(); setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} vehicles={customerVehicles} onBack={() => setView('home')} onSchedule={() => setView('booking')} /> : view === 'vehicles' ? <MyVehicles vehicles={customerVehicles} onBack={() => setView('home')} onChanged={async message => { await loadCustomerVehicles(); action(message) }} /> : view === 'profile' ? <CustomerProfileView profile={profile} settings={customerSettings} onBack={() => setView('home')} onSaved={settings => { setCustomerSettings(settings); onProfileChange?.({ ...profile, name: settings.fullName || profile.name }); action('Profile updated.') }} /> : <>
         <section className="customer-grid"><article className="role-panel live-service">{activeOrder ? <><div className="role-panel-head"><div><span className="eyebrow">REAL-TIME SERVICE TRACKING</span><h2>{activeOrder.service}</h2><p>{activeOrder.code} · {activeOrder.vehicle}</p></div><span className="status green">{activeOrder.status}</span></div><div className="customer-timeline">{['Appointment created','Vehicle received','Checklist and diagnosis','Service in progress','Ready for pickup'].map((step,index) => <div className={index === 0 ? 'done' : ''} key={step}><span>{index === 0 ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index === 0 ? 'Now' : 'Pending'}</small></p></div>)}</div><div className="live-actions"><button className="secondary-btn" onClick={() => action('Repair order chat opened.')}><MessageCircle /> Message the shop</button><button className="secondary-btn danger-btn" onClick={async () => { if (!confirm(`Cancel appointment ${activeOrder.code}?`)) return; try { await cancelRepairOrder(activeOrder.id, 'Cancelled by customer.'); setRemoteOrders(await fetchServiceOrders(profile)); action('Appointment cancelled. The shop was notified.') } catch (error) { action(error instanceof Error ? error.message : 'Could not cancel appointment.') } }}>Cancel appointment</button><button className="primary-btn" onClick={() => action('Repair order details loaded.')}><FileText /> View details</button></div></> : <div className="empty">No service created yet. Click Schedule service to begin.</div>}</article>
           <aside className="customer-side"><article className="role-panel estimate-card"><ReceiptText /><span>{activeOrder ? 'Repair order estimate' : 'No estimate'}</span><strong>{activeOrder ? activeOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '$0.00'}</strong><small>{activeOrder ? activeOrder.status : 'Waiting for first service'}</small><button onClick={() => action(activeOrder ? 'Estimate opened.' : 'No estimate created yet.')}>View estimate <ChevronRight /></button></article><article className="role-panel quick-card"><h2>Quick access</h2><button onClick={() => setView('vehicles')}><Car />My vehicles<ChevronRight /></button><button onClick={() => setView('history')}><History />Vehicle history<ChevronRight /></button><button onClick={() => action('Vehicle documents loaded.')}><ClipboardCheck />Documents and checklists<ChevronRight /></button><button onClick={() => setView('profile')}><Settings2 />Profile settings<ChevronRight /></button></article></aside>
         </section>
@@ -416,6 +416,50 @@ function Booking({ profile, vehicles, onBack, onConfirm }: { profile: UserProfil
   </section>
 }
 
-function HistoryView({ orders, onBack }: { orders: ServiceOrder[]; onBack: () => void }) {
-  return <section className="role-panel history-view"><button className="back-link" onClick={onBack}>Back</button><span className="eyebrow">VEHICLE HISTORY</span><h1>Registered services</h1><p>All real services registered at this shop.</p>{orders.map(order => <article key={order.id}><span className="history-icon"><Wrench /></span><div><strong>{order.service}</strong><span>{order.date} · {order.code}</span></div><strong>{order.total.toLocaleString('en-US',{style:'currency',currency:'USD'})}</strong><span className="status dark">{order.status}</span></article>)}{orders.length === 0 && <div className="empty">No history created yet.</div>}</section>
+function HistoryView({ orders, vehicles, onBack, onSchedule }: { orders: ServiceOrder[]; vehicles: CustomerVehicle[]; onBack: () => void; onSchedule: () => void }) {
+  const [vehicleFilter, setVehicleFilter] = useState('all')
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(orders[0]?.id ?? null)
+  const filteredOrders = vehicleFilter === 'all' ? orders : orders.filter(order => order.vehicleId === vehicleFilter)
+  const selectedOrder = filteredOrders.find(order => order.id === selectedOrderId) ?? filteredOrders[0] ?? null
+  const completedCount = filteredOrders.filter(order => order.status === 'Completed').length
+  const activeCount = filteredOrders.filter(order => order.status !== 'Completed' && order.status !== 'Cancelled').length
+  const totalSpent = filteredOrders.reduce((sum, order) => sum + order.total, 0)
+
+  useEffect(() => {
+    if (!filteredOrders.some(order => order.id === selectedOrderId)) setSelectedOrderId(filteredOrders[0]?.id ?? null)
+  }, [filteredOrders, selectedOrderId])
+
+  return <section className="role-panel history-view history-pro">
+    <div className="history-head">
+      <button className="back-link" onClick={onBack}>Back</button>
+      <button className="primary-btn" onClick={onSchedule}><CalendarDays /> Schedule service</button>
+    </div>
+    <span className="eyebrow">VEHICLE HISTORY</span>
+    <h1>Service records</h1>
+    <p>Filter by vehicle and open each repair order to review status, estimate, mechanic, and service details.</p>
+    <div className="history-controls">
+      <label>Vehicle<select value={vehicleFilter} onChange={event => setVehicleFilter(event.target.value)}><option value="all">All vehicles</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.make} {vehicle.model}{vehicle.year ? ` ${vehicle.year}` : ''} · {vehicle.plate}</option>)}</select></label>
+      <div className="history-summary"><span><strong>{filteredOrders.length}</strong>Records</span><span><strong>{activeCount}</strong>Active</span><span><strong>{completedCount}</strong>Completed</span><span><strong>{totalSpent.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong>Total</span></div>
+    </div>
+    <div className="history-layout">
+      <div className="history-list">
+        {filteredOrders.map(order => <button className={selectedOrder?.id === order.id ? 'history-card active' : 'history-card'} key={order.id} onClick={() => setSelectedOrderId(order.id)}>
+          <OrderVehicleImage order={order} className="history-car-image" />
+          <div><small>{order.code} · {order.date}</small><strong>{order.service}</strong><span>{order.vehicle} · {order.plate}</span></div>
+          <span className={`status ${order.status === 'Completed' ? 'green' : order.status === 'Cancelled' ? 'gray' : order.status === 'Estimate' ? 'amber' : 'blue'}`}>{order.status}</span>
+        </button>)}
+        {filteredOrders.length === 0 && <div className="empty">No service history for this vehicle yet.</div>}
+      </div>
+      <aside className="history-detail">
+        {selectedOrder ? <>
+          <OrderVehicleImage order={selectedOrder} className="history-detail-image" />
+          <div className="history-detail-title"><span className="eyebrow">{selectedOrder.code}</span><h2>{selectedOrder.vehicle}</h2><p>{selectedOrder.plate} · {selectedOrder.date}</p></div>
+          <div className="history-detail-grid"><div><span>Status</span><strong>{selectedOrder.status}</strong></div><div><span>Mechanic</span><strong>{selectedOrder.mechanic}</strong></div><div><span>Estimate</span><strong>{selectedOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</strong></div><div><span>Progress</span><strong>{selectedOrder.progress}%</strong></div></div>
+          <div className="history-progress"><i style={{ width: `${selectedOrder.progress}%` }} /></div>
+          <article><h3>Service request</h3><p>{selectedOrder.service}</p></article>
+          <article><h3>Next action</h3><p>{selectedOrder.status === 'Estimate' ? 'Review and approve the estimate when the shop sends it.' : selectedOrder.status === 'Completed' ? 'Service completed. Keep this record for future maintenance.' : selectedOrder.status === 'Cancelled' ? 'This appointment was cancelled.' : 'The shop will update this repair order as work progresses.'}</p></article>
+        </> : <div className="empty">Select a service record to view details.</div>}
+      </aside>
+    </div>
+  </section>
 }

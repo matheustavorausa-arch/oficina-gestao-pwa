@@ -93,6 +93,7 @@ export async function fetchServiceOrders(profile: UserProfile): Promise<ServiceO
       id: order.id,
       code: `RO-${String(order.number).padStart(4, '0')}`,
       customer: order.customers?.full_name ?? 'Customer',
+      vehicleId: order.vehicle_id,
       vehicle: vehicle ? `${vehicle.make} ${vehicle.model}${vehicle.year ? ` ${vehicle.year}` : ''}` : 'Vehicle',
       plate: vehicle?.plate ?? 'No plate',
       vehicleImage: vehicle?.vehicle_model_catalog?.image_url ?? undefined,

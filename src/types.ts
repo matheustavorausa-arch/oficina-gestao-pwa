@@ -13,6 +13,7 @@ export interface ServiceOrder {
   id: string
   code: string
   customer: string
+  vehicleId?: string
   vehicle: string
   plate: string
   vehicleImage?: string
