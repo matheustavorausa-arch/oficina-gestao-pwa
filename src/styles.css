@@ -189,3 +189,78 @@ table{font-size:12px}th{padding:15px 18px;background:#080d13;color:#778391}td{pa
 .estimate-composer,.estimate-decision{padding:28px;max-width:980px;margin:auto}.estimate-composer h1,.estimate-decision h1{font:800 30px 'Manrope';margin:8px 0 6px}.estimate-composer>p,.estimate-decision>p{color:#9aa5b1;margin:0 0 22px}.estimate-line-items,.estimate-review-items{display:flex;flex-direction:column;gap:12px;margin:18px 0}.estimate-line-item{border:1px solid #26313d;background:linear-gradient(180deg,#111820,#090e14);border-radius:18px;padding:14px;display:grid;grid-template-columns:120px 1fr 90px 130px auto;gap:10px;align-items:end}.estimate-line-item label,.estimate-notes label{display:flex;flex-direction:column;gap:6px;color:#9aa5b1;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.6px}.estimate-line-item .wide{min-width:180px}.estimate-line-item input,.estimate-line-item select,.estimate-notes input,.estimate-notes textarea{border:1px solid #26313d;border-radius:12px;background:#0a0f15;color:#fff;padding:11px;outline:none}.estimate-notes{margin-top:14px}.estimate-total-box{border:1px solid #26313d;background:linear-gradient(180deg,#111820,#090e14);border-radius:18px;padding:16px;display:flex;justify-content:flex-end;gap:22px;flex-wrap:wrap;margin:16px 0;color:#9aa5b1}.estimate-total-box strong{display:block;color:#fff;font:800 20px 'Manrope';margin-top:4px}.estimate-review-head{display:flex;align-items:center;justify-content:space-between;border:1px solid #26313d;background:linear-gradient(180deg,#111820,#090e14);border-radius:18px;padding:18px;margin:18px 0}.estimate-review-head>strong{font:900 32px 'Manrope';color:#22c55e}.estimate-review-items article{border:1px solid #26313d;background:#0a0f15;border-radius:16px;padding:14px;display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;color:#fff}.estimate-review-items article div{display:flex;flex-direction:column}.estimate-review-items article span{color:#9aa5b1;font-size:12px}.estimate-notes-card{border:1px solid #26313d;background:#0a0f15;border-radius:16px;padding:16px;margin:16px 0;color:#c0c8d2}.estimate-notes-card h3{margin:0 0 8px;font-size:14px;color:#fff}.estimate-notes-card p{margin:0;line-height:1.5}.estimate-decision-note{margin:16px 0!important}
 @media(max-width:760px){.estimate-composer,.estimate-decision{padding:20px 14px}.estimate-line-item{grid-template-columns:1fr}.estimate-line-item .wide{min-width:0}.estimate-total-box{justify-content:flex-start}.estimate-review-head{align-items:flex-start;gap:10px;flex-direction:column}.estimate-review-items article{grid-template-columns:1fr}.estimate-review-head>strong{font-size:26px}}
 @media(max-width:760px){input,select,textarea{font-size:16px!important}.input-wrap input,.premium-input input,.premium-input select,.premium-input textarea{font-size:16px!important}}
+
+/* Vehicle image fit polish: keep every vehicle picture contained, centered and rounded */
+.vehicle-art,
+.task-car,
+.big-car{
+  overflow:hidden!important;
+  border-radius:22px!important;
+  background:linear-gradient(180deg,#111820,#070b10)!important;
+  border:1px solid #303b47!important;
+  display:grid!important;
+  place-items:center!important;
+}
+.vehicle-art-image,
+.task-car-image,
+.big-car-image{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+  object-position:center!important;
+  border-radius:18px!important;
+  padding:6px!important;
+  background:radial-gradient(circle at 50% 42%,#202a34 0,#0b1118 58%,#05070a 100%)!important;
+  box-sizing:border-box!important;
+}
+.garage-card img,
+.garage-selected img,
+.history-car-image,
+.history-detail-image,
+.chat-order-image,
+.chat-title-image{
+  object-fit:contain!important;
+  object-position:center!important;
+  border-radius:18px!important;
+  padding:7px!important;
+  background:radial-gradient(circle at 50% 42%,#202a34 0,#0b1118 58%,#05070a 100%)!important;
+  box-sizing:border-box!important;
+}
+.vehicle-thumb{
+  object-fit:contain!important;
+  object-position:center!important;
+  border-radius:14px!important;
+  padding:4px!important;
+  background:radial-gradient(circle at 50% 42%,#202a34 0,#0b1118 58%,#05070a 100%)!important;
+  box-sizing:border-box!important;
+}
+@media(max-width:760px){
+  .vehicle-card{
+    grid-template-columns:104px minmax(0,1fr) 20px!important;
+    gap:14px!important;
+    align-items:center!important;
+  }
+  .vehicle-art{
+    width:92px!important;
+    height:78px!important;
+    padding:7px!important;
+    border-radius:24px!important;
+    box-sizing:border-box!important;
+  }
+  .vehicle-art-image{
+    border-radius:18px!important;
+    padding:5px!important;
+  }
+  .big-car{
+    width:122px!important;
+    height:86px!important;
+  }
+  .garage-card img{
+    width:96px!important;
+    height:68px!important;
+  }
+  .garage-selected img{
+    width:92px!important;
+    height:64px!important;
+  }
+}
