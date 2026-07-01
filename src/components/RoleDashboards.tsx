@@ -117,7 +117,7 @@ export function CustomerDashboard({ profile, onLogout }: Props) {
   return <div className="role-app customer-app">
     <RoleHeader profile={profile} onLogout={onLogout} title="Customer Area" />
     <main className="role-content customer-content">
-      <section className="customer-hero"><div><span className="eyebrow">WELCOME TO YOUR GARAGE</span><h1>Hello, {profile.name.split(' ')[0]}.</h1><p>Track your vehicle and schedule services without calling the shop.</p><button className="primary-btn" onClick={() => setView('booking')}><CalendarDays /> Schedule service</button></div><div className="vehicle-card"><span className="vehicle-art">{activeOrder ? <OrderVehicleImage order={activeOrder} className="vehicle-art-image" /> : <Car />}</span><p><small>{activeOrder ? 'YOUR VEHICLE' : 'FIRST STEP'}</small><strong>{activeOrder?.vehicle ?? 'Add your vehicle'}</strong><span>{activeOrder ? `${activeOrder.plate} · ${activeOrder.status}` : 'Create an appointment to start testing'}</span></p><button onClick={() => setView('booking')}><ChevronRight /></button></div></section>
+      <section className="customer-hero"><div><span className="eyebrow">WELCOME TO YOUR GARAGE</span><h1>Hello, {profile.name.split(' ')[0]}.</h1><p>Track your vehicle and schedule services without calling the shop.</p><button className="primary-btn" onClick={() => setView('booking')}><CalendarDays /> Schedule service</button></div><button type="button" className="vehicle-card vehicle-card-button" onClick={() => setView('booking')}><span className="vehicle-art">{activeOrder ? <OrderVehicleImage order={activeOrder} className="vehicle-art-image" /> : <Car />}</span><p><small>{activeOrder ? 'YOUR VEHICLE' : 'FIRST STEP'}</small><strong>{activeOrder?.vehicle ?? 'Add your vehicle'}</strong><span>{activeOrder ? `${activeOrder.plate} · ${activeOrder.status}` : 'Create an appointment to start testing'}</span></p><ChevronRight /></button></section>
       {view === 'booking' ? <Booking profile={profile} onBack={() => setView('home')} onConfirm={() => { setView('home'); action('Appointment sent to the shop. Owner and mechanic can see it now.') }} /> : view === 'history' ? <HistoryView orders={remoteOrders} onBack={() => setView('home')} /> : <>
         <section className="customer-grid"><article className="role-panel live-service">{activeOrder ? <><div className="role-panel-head"><div><span className="eyebrow">REAL-TIME SERVICE TRACKING</span><h2>{activeOrder.service}</h2><p>{activeOrder.code} · {activeOrder.vehicle}</p></div><span className="status green">{activeOrder.status}</span></div><div className="customer-timeline">{['Appointment created','Vehicle received','Checklist and diagnosis','Service in progress','Ready for pickup'].map((step,index) => <div className={index === 0 ? 'done' : ''} key={step}><span>{index === 0 ? <Check /> : index + 1}</span><p><strong>{step}</strong><small>{index === 0 ? 'Now' : 'Pending'}</small></p></div>)}</div><div className="live-actions"><button className="secondary-btn" onClick={() => action('Repair order chat opened.')}><MessageCircle /> Message the shop</button><button className="primary-btn" onClick={() => action('Repair order details loaded.')}><FileText /> View details</button></div></> : <div className="empty">No service created yet. Click Schedule service to begin.</div>}</article>
           <aside className="customer-side"><article className="role-panel estimate-card"><ReceiptText /><span>{activeOrder ? 'Repair order estimate' : 'No estimate'}</span><strong>{activeOrder ? activeOrder.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '$0.00'}</strong><small>{activeOrder ? activeOrder.status : 'Waiting for first service'}</small><button onClick={() => action(activeOrder ? 'Estimate opened.' : 'No estimate created yet.')}>View estimate <ChevronRight /></button></article><article className="role-panel quick-card"><h2>Quick access</h2><button onClick={() => setView('history')}><History />Vehicle history<ChevronRight /></button><button onClick={() => action('Vehicle documents loaded.')}><ClipboardCheck />Documents and checklists<ChevronRight /></button><button onClick={() => action('Preferences opened.')}><Settings2 />Preferences<ChevronRight /></button></article></aside>
@@ -131,7 +131,8 @@ export function CustomerDashboard({ profile, onLogout }: Props) {
 
 function Booking({ profile, onBack, onConfirm }: { profile: UserProfile; onBack: () => void; onConfirm: () => void }) {
   const [service, setService] = useState('Oil change')
-  const [vehicleChoice, setVehicleChoice] = useState('Honda|Civic')
+  const [selectedMake, setSelectedMake] = useState('Honda')
+  const [selectedModel, setSelectedModel] = useState('Civic')
   const [customVehicle, setCustomVehicle] = useState('')
   const [vehicleYear, setVehicleYear] = useState(String(new Date().getFullYear()))
   const [vehicleColor, setVehicleColor] = useState('')
@@ -141,13 +142,25 @@ function Booking({ profile, onBack, onConfirm }: { profile: UserProfile; onBack:
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [selectedMake, selectedModel] = vehicleChoice.split('|')
+  const vehicleMakes = Array.from(new Set(VEHICLES.map(vehicle => vehicle.make))).sort()
+  const modelOptions = VEHICLES.filter(vehicle => vehicle.make === selectedMake)
   const selectedVehicle = findVehicleModel(selectedMake, selectedModel)
 
-  function changeVehicleChoice(nextChoice: string) {
-    setVehicleChoice(nextChoice)
-    const [make, model] = nextChoice.split('|')
-    const nextVehicle = findVehicleModel(make, model)
+  function changeVehicleMake(nextMake: string) {
+    setSelectedMake(nextMake)
+    if (nextMake === 'Other') {
+      setSelectedModel('Other model')
+      return
+    }
+    const nextVehicle = VEHICLES.find(vehicle => vehicle.make === nextMake)
+    if (!nextVehicle) return
+    setSelectedModel(nextVehicle.model)
+    if (nextVehicle.years[0]) setVehicleYear(String(nextVehicle.years[0]))
+  }
+
+  function changeVehicleModel(nextModel: string) {
+    setSelectedModel(nextModel)
+    const nextVehicle = findVehicleModel(selectedMake, nextModel)
     if (nextVehicle?.years[0]) setVehicleYear(String(nextVehicle.years[0]))
   }
 
@@ -191,8 +204,9 @@ function Booking({ profile, onBack, onConfirm }: { profile: UserProfile; onBack:
     <p>Choose the service, add your vehicle, and briefly describe what is happening.</p>
     <div className="service-choices">{['Oil change','Brakes','Tires','Diagnostic','A/C service','Suspension'].map((item,index) => <button type="button" className={service === item ? 'active' : ''} onClick={() => setService(item)} key={item}>{[<Gauge />,<Settings2 />,<Car />,<ClipboardCheck />,<Wrench />,<Settings2 />][index]}<span>{item}</span></button>)}</div>
     <div className="booking-form">
-      <label>Vehicle<select value={vehicleChoice} onChange={event => changeVehicleChoice(event.target.value)}>{VEHICLES.map(vehicle => <option key={`${vehicle.make}-${vehicle.model}`} value={`${vehicle.make}|${vehicle.model}`}>{vehicle.make} {vehicle.model}</option>)}<option value="Other|Other model">Other / I cannot find my car</option></select></label>
-      {vehicleChoice.startsWith('Other|') && <label>Make and model<input value={customVehicle} onChange={event => setCustomVehicle(event.target.value)} placeholder="Example: Dodge Charger" required /></label>}
+      <label>Make<select value={selectedMake} onChange={event => changeVehicleMake(event.target.value)}>{vehicleMakes.map(make => <option key={make}>{make}</option>)}<option value="Other">Other / I cannot find my car</option></select></label>
+      {selectedMake !== 'Other' && <label>Model<select value={selectedModel} onChange={event => changeVehicleModel(event.target.value)}>{modelOptions.map(vehicle => <option key={`${vehicle.make}-${vehicle.model}`} value={vehicle.model}>{vehicle.model}</option>)}</select></label>}
+      {selectedMake === 'Other' && <label className="wide">Make and model<input value={customVehicle} onChange={event => setCustomVehicle(event.target.value)} placeholder="Example: Dodge Charger" required /></label>}
       <label>Year{selectedVehicle ? <select value={vehicleYear} onChange={event => setVehicleYear(event.target.value)}>{selectedVehicle.years.map(year => <option key={year}>{year}</option>)}</select> : <input type="number" min="1980" max="2030" value={vehicleYear} onChange={event => setVehicleYear(event.target.value)} />}</label>
       <label>Color<input value={vehicleColor} onChange={event => setVehicleColor(event.target.value)} placeholder="Black" /></label>
       <label>Plate<input value={vehiclePlate} onChange={event => setVehiclePlate(event.target.value.toUpperCase())} placeholder="ABC1234" /></label>
