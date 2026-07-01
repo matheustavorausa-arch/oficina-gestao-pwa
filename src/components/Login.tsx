@@ -9,6 +9,14 @@ type Mode = 'login' | 'forgot' | 'register'
 const rememberedLoginKey = 'torque_remembered_login'
 const recentLoginsKey = 'torque_recent_logins'
 
+function resolveDisplayName(fullName?: string | null, metadataName?: unknown, email?: string | null) {
+  const cleanFullName = fullName?.trim()
+  if (cleanFullName && !cleanFullName.includes('@')) return cleanFullName
+  const cleanMetadataName = typeof metadataName === 'string' ? metadataName.trim() : ''
+  if (cleanMetadataName && !cleanMetadataName.includes('@')) return cleanMetadataName
+  return email ?? 'User'
+}
+
 function getRecentLogins() {
   try {
     const value = localStorage.getItem(recentLoginsKey)
@@ -121,7 +129,7 @@ export function Login({ onLogin }: Props) {
     onLogin({
       userId: data.user.id,
       workshopId: raw?.workshop_id ?? ownProfile?.workshop_id,
-      name: ownProfile?.full_name ?? data.user.email!,
+      name: resolveDisplayName(ownProfile?.full_name, data.user.user_metadata?.full_name, data.user.email),
       role: raw?.role ?? 'customer',
       workshopName: raw?.workshops?.name ?? 'My Workshop',
     })

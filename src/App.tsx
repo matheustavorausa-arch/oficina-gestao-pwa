@@ -5,6 +5,14 @@ import { CustomerDashboard, MechanicDashboard } from './components/RoleDashboard
 import { supabase } from './lib/supabase'
 import type { UserProfile } from './types'
 
+function resolveDisplayName(fullName?: string | null, metadataName?: unknown, email?: string | null) {
+  const cleanFullName = fullName?.trim()
+  if (cleanFullName && !cleanFullName.includes('@')) return cleanFullName
+  const cleanMetadataName = typeof metadataName === 'string' ? metadataName.trim() : ''
+  if (cleanMetadataName && !cleanMetadataName.includes('@')) return cleanMetadataName
+  return email ?? 'User'
+}
+
 async function resolveSupabaseProfile(): Promise<UserProfile | null> {
   if (!supabase) return null
   const { data: sessionData } = await supabase.auth.getSession()
@@ -40,7 +48,7 @@ async function resolveSupabaseProfile(): Promise<UserProfile | null> {
   return {
     userId: user.id,
     workshopId,
-    name: ownProfile?.full_name ?? user.email ?? 'User',
+    name: resolveDisplayName(ownProfile?.full_name, user.user_metadata?.full_name, user.email),
     role: member?.role ?? 'customer',
     workshopName,
   }
