@@ -8,7 +8,7 @@ import { OTHER_VEHICLE_MAKE, VEHICLES, VEHICLE_MAKE_OPTIONS, findVehicleModel, v
 import { cancelRepairOrder } from '../lib/cancellations'
 import { deleteCustomerVehicle, fetchCustomerVehicles, saveCustomerVehicle, type CustomerVehicle } from '../lib/customerVehicles'
 import { fetchCustomerProfile, updateCustomerProfile, type CustomerProfileSettings } from '../lib/customerProfile'
-import { fetchOrderChatMessages, sendOrderChatMessage, type OrderChatMessage } from '../lib/orderChat'
+import { fetchOrderChatMessages, sendOrderChatMessage, uploadOrderChatPhoto, type OrderChatMessage } from '../lib/orderChat'
 import type { ServiceOrder, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
@@ -171,10 +171,22 @@ function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { p
   const [selectedOrderId, setSelectedOrderId] = useState(activeOrder?.id ?? chatOrders[0]?.id ?? '')
   const [messages, setMessages] = useState<OrderChatMessage[]>([])
   const [draft, setDraft] = useState('')
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState('')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const selectedOrder = chatOrders.find(order => order.id === selectedOrderId) ?? null
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreview('')
+      return
+    }
+    const nextPreview = URL.createObjectURL(photoFile)
+    setPhotoPreview(nextPreview)
+    return () => URL.revokeObjectURL(nextPreview)
+  }, [photoFile])
 
   useEffect(() => {
     if (!selectedOrderId && chatOrders[0]) setSelectedOrderId(chatOrders[0].id)
@@ -204,12 +216,18 @@ function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { p
 
   async function sendMessage() {
     const body = draft.trim()
-    if (!selectedOrder || !body) return
+    if (!selectedOrder || (!body && !photoFile)) return
+    if (photoFile && !profile.userId) {
+      setError('User profile is not ready for photo upload.')
+      return
+    }
     setSending(true)
     setError('')
     try {
-      await sendOrderChatMessage(selectedOrder.id, body)
+      const attachmentPath = photoFile ? await uploadOrderChatPhoto(selectedOrder.id, profile.userId!, photoFile) : null
+      await sendOrderChatMessage(selectedOrder.id, body || 'Photo', attachmentPath)
       setDraft('')
+      setPhotoFile(null)
       setMessages(await fetchOrderChatMessages(selectedOrder.id, profile.userId))
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Could not send message.')
@@ -243,16 +261,22 @@ function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { p
         {selectedOrder && <div className="chat-title"><OrderVehicleImage order={selectedOrder} className="chat-title-image" /><div><strong>{selectedOrder.vehicle}</strong><span>{selectedOrder.code} · {selectedOrder.plate}</span></div></div>}
         <div className="chat-messages">
           {loading && <div className="empty">Loading messages...</div>}
-          {!loading && messages.map(message => <article key={message.id} className={message.isMine ? 'chat-bubble mine' : 'chat-bubble'}>
-            <small>{message.isMine ? 'You' : 'Shop'} · {new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(message.createdAt))}</small>
-            <p>{message.body}</p>
-          </article>)}
+          {!loading && messages.map(message => <div key={message.id} className={message.isMine ? 'chat-row mine' : 'chat-row'}>
+            <span className={message.isMine ? 'chat-avatar customer' : 'chat-avatar shop'}>{message.isMine ? '🙂' : <img src={defaultMechanicAvatar} alt="Shop" />}</span>
+            <article className={message.isMine ? 'chat-bubble mine' : 'chat-bubble'}>
+              <small>{message.isMine ? 'You' : 'Shop'} · {new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(message.createdAt))}</small>
+              {message.attachmentUrl && <a href={message.attachmentUrl} target="_blank" rel="noreferrer"><img className="chat-photo" src={message.attachmentUrl} alt="Chat attachment" /></a>}
+              <p>{message.body}</p>
+            </article>
+          </div>)}
           {!loading && messages.length === 0 && <div className="empty">No messages yet. Send the first update to the shop.</div>}
         </div>
         {error && <div className="form-message">{error}</div>}
+        {photoPreview && <div className="chat-photo-preview"><img src={photoPreview} alt="Selected attachment" /><span>{photoFile?.name}</span><button className="secondary-btn" onClick={() => setPhotoFile(null)}>Remove</button></div>}
         <div className="chat-composer">
+          <label className="chat-photo-button"><Camera /><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setPhotoFile(event.target.files?.[0] ?? null)} /></label>
           <textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Type your message to the shop..." onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage() } }} />
-          <button className="primary-btn" disabled={sending || !draft.trim()} onClick={sendMessage}><Send /> {sending ? 'Sending...' : 'Send'}</button>
+          <button className="primary-btn" disabled={sending || (!draft.trim() && !photoFile)} onClick={sendMessage}><Send /> {sending ? 'Sending...' : 'Send'}</button>
         </div>
       </div>
     </div>
