@@ -29,6 +29,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
   const [toast, setToast] = useState('')
   const [status, setStatus] = useState('Evaluation')
   const [avatarUrl, setAvatarUrl] = useState(defaultMechanicAvatar)
+  const [view, setView] = useState<'services' | 'chat'>('services')
   const tasks = remoteOrders.filter(order => order.status !== 'Completed' && order.status !== 'Cancelled')
   function action(text: string) { setToast(text); setTimeout(() => setToast(''), 2300) }
 
@@ -41,6 +42,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
       setRemoteOrders(items)
       setSelected(items.find(order => order.status !== 'Completed' && order.status !== 'Cancelled') ?? null)
       action('Service cancelled. Owner and customer were notified.')
+      setView('services')
     } catch (error) {
       action(error instanceof Error ? error.message : 'Could not cancel service.')
     }
@@ -94,6 +96,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
   return <div className="role-app mechanic-app">
     <RoleHeader profile={profile} onLogout={onLogout} title="Mechanic Area" />
     <main className="role-content">
+      {view === 'chat' ? <OrderChatView profile={profile} orders={tasks} activeOrder={selected} audience="staff" onBack={() => setView('services')} /> : <>
       <section className="role-welcome">
         <div className="mechanic-profile-hero">
           <label className="mechanic-self-avatar"><img src={avatarUrl} alt={profile.name} /><input type="file" accept="image/*" onChange={event => changeOwnAvatar(event.target.files?.[0])} /><span>Change photo</span></label>
@@ -109,11 +112,12 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
           <div className="status-steps">{['Arrived','Evaluation','Waiting Approval','In Progress','Ready'].map((step, index) => <button key={step} className={status === step ? 'active' : index === 0 ? 'done' : ''} onClick={() => { setStatus(step); action(`Status updated: ${step}`) }}><span>{index === 0 ? <Check /> : index + 1}</span><small>{step}</small></button>)}</div>
           <label className="notes-label">Comments / notes<textarea defaultValue="Vehicle is under evaluation. Add service notes here." /></label>
           <div className="photo-strip"><button onClick={() => action('Camera ready to attach a photo.')}><Camera /><span>Add photo</span></button><span><Wrench /></span><span><Gauge /></span><span><Car /></span></div>
-          <div className="stacked-actions"><button className="primary-btn full" onClick={() => action('Update sent to the customer.')}><Send /> Send update</button><button className="secondary-btn danger-btn full" onClick={cancelSelectedOrder}>Cancel service</button></div>
+          <div className="stacked-actions"><button className="primary-btn full" onClick={() => action('Update sent to the customer.')}><Send /> Send update</button><button className="secondary-btn full" onClick={() => setView('chat')}><MessageCircle /> Chat with customer</button><button className="secondary-btn danger-btn full" onClick={cancelSelectedOrder}>Cancel service</button></div>
         </section> : <section className="role-panel service-detail"><div className="empty">Waiting for the first customer appointment.</div></section>}
       </div>
+      </>}
     </main>
-    <nav className="role-bottom-nav"><button className="active"><Home />Home</button><button><CalendarDays />Schedule</button><button className="nav-main"><Plus /></button><button><Car />Vehicles</button><button><UserRound />Profile</button></nav><Toast text={toast} />
+    <nav className="role-bottom-nav"><button className={view === 'services' ? 'active' : ''} onClick={() => setView('services')}><Home />Home</button><button><CalendarDays />Schedule</button><button className="nav-main"><Plus /></button><button className={view === 'chat' ? 'active' : ''} onClick={() => setView('chat')}><MessageCircle />Messages</button><button><UserRound />Profile</button></nav><Toast text={toast} />
   </div>
 }
 
@@ -166,7 +170,7 @@ export function CustomerDashboard({ profile, onLogout, onProfileChange }: Props)
   </div>
 }
 
-function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { profile: UserProfile; orders: ServiceOrder[]; activeOrder: ServiceOrder | null; onBack: () => void; onSchedule: () => void }) {
+function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule, audience = 'customer' }: { profile: UserProfile; orders: ServiceOrder[]; activeOrder: ServiceOrder | null; onBack: () => void; onSchedule?: () => void; audience?: 'customer' | 'staff' }) {
   const chatOrders = orders.filter(order => order.status !== 'Cancelled')
   const [selectedOrderId, setSelectedOrderId] = useState(activeOrder?.id ?? chatOrders[0]?.id ?? '')
   const [messages, setMessages] = useState<OrderChatMessage[]>([])
@@ -177,6 +181,9 @@ function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { p
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const selectedOrder = chatOrders.find(order => order.id === selectedOrderId) ?? null
+  const ownAvatar = audience === 'staff' ? defaultMechanicAvatar : '/customer-avatar.svg'
+  const otherAvatar = audience === 'staff' ? '/customer-avatar.svg' : defaultMechanicAvatar
+  const otherLabel = audience === 'staff' ? 'Customer' : 'Shop'
 
   useEffect(() => {
     if (!photoFile) {
@@ -241,7 +248,7 @@ function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { p
       <button className="back-link" onClick={onBack}>Back</button>
       <span className="eyebrow">MESSAGES</span>
       <h1>Chat with the shop</h1>
-      <div className="empty chat-empty"><MessageCircle /><strong>No repair order yet.</strong><p>Schedule a service to start messaging the shop.</p><button className="primary-btn" onClick={onSchedule}><CalendarDays /> Schedule service</button></div>
+      <div className="empty chat-empty"><MessageCircle /><strong>No repair order yet.</strong><p>{audience === 'staff' ? 'No assigned service is available for chat.' : 'Schedule a service to start messaging the shop.'}</p>{onSchedule && <button className="primary-btn" onClick={onSchedule}><CalendarDays /> Schedule service</button>}</div>
     </section>
   }
 
@@ -262,9 +269,9 @@ function OrderChatView({ profile, orders, activeOrder, onBack, onSchedule }: { p
         <div className="chat-messages">
           {loading && <div className="empty">Loading messages...</div>}
           {!loading && messages.map(message => <div key={message.id} className={message.isMine ? 'chat-row mine' : 'chat-row'}>
-            <span className={message.isMine ? 'chat-avatar customer' : 'chat-avatar shop'}><img src={message.isMine ? '/customer-avatar.svg' : defaultMechanicAvatar} alt={message.isMine ? 'Customer' : 'Shop'} /></span>
+            <span className={message.isMine ? 'chat-avatar shop' : 'chat-avatar customer'}><img src={message.isMine ? ownAvatar : otherAvatar} alt={message.isMine ? 'You' : otherLabel} /></span>
             <article className={message.isMine ? 'chat-bubble mine' : 'chat-bubble'}>
-              <small>{message.isMine ? 'You' : 'Shop'} · {new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(message.createdAt))}</small>
+              <small>{message.isMine ? 'You' : otherLabel} · {new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(message.createdAt))}</small>
               {message.attachmentUrl && <a href={message.attachmentUrl} target="_blank" rel="noreferrer"><img className="chat-photo" src={message.attachmentUrl} alt="Chat attachment" /></a>}
               <p>{message.body}</p>
             </article>
