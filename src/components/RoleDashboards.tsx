@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, CalendarDays, Camera, Car, Check, ChevronRight, ClipboardCheck, Clock3, FileText, Gauge, History, Home, LogOut, MessageCircle, Plus, ReceiptText, Send, Settings2, UserRound, Wrench } from 'lucide-react'
 import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '../lib/avatars'
-import { fetchServiceOrders, updateServiceOrderStatus } from '../lib/serviceOrders'
+import { fetchLatestServiceOrderNote, fetchServiceOrders, sendServiceOrderUpdate, updateServiceOrderStatus } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
 import { workshopSchedulingConfig } from '../config/workshop'
 import { OTHER_VEHICLE_MAKE, OTHER_VEHICLE_MODEL, VEHICLES, VEHICLE_MAKE_OPTIONS, findVehicleModel, vehicleImageForText } from '../lib/vehicles'
@@ -29,6 +29,8 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
   const [selected, setSelected] = useState<ServiceOrder | null>(null)
   const [toast, setToast] = useState('')
   const [savingStatus, setSavingStatus] = useState(false)
+  const [savingUpdate, setSavingUpdate] = useState(false)
+  const [updateNote, setUpdateNote] = useState('')
   const [avatarUrl, setAvatarUrl] = useState(defaultMechanicAvatar)
   const [view, setView] = useState<'services' | 'chat' | 'estimate'>('services')
   const tasks = remoteOrders.filter(order => order.status !== 'Completed' && order.status !== 'Cancelled')
@@ -62,6 +64,25 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
       action(error instanceof Error ? error.message : 'Could not update service status.')
     } finally {
       setSavingStatus(false)
+    }
+  }
+
+  async function sendSelectedUpdate() {
+    if (!selected || savingUpdate) return
+    const note = updateNote.trim()
+    if (!note) {
+      action('Add a comment before sending the update.')
+      return
+    }
+    setSavingUpdate(true)
+    try {
+      await sendServiceOrderUpdate(selected, selected.status, note)
+      await refreshOrders(selected.id)
+      action('Update sent to owner and customer.')
+    } catch (error) {
+      action(error instanceof Error ? error.message : 'Could not send service update.')
+    } finally {
+      setSavingUpdate(false)
     }
   }
 
@@ -120,6 +141,18 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
     return () => { client.removeChannel(channel) }
   }, [profile.userId, profile.workshopId])
 
+  useEffect(() => {
+    if (!selected?.id) {
+      setUpdateNote('')
+      return
+    }
+    let ignore = false
+    fetchLatestServiceOrderNote(selected.id)
+      .then(note => { if (!ignore) setUpdateNote(note) })
+      .catch(() => { if (!ignore) setUpdateNote('') })
+    return () => { ignore = true }
+  }, [selected?.id])
+
   return <div className="role-app mechanic-app">
     <RoleHeader profile={profile} onLogout={onLogout} title="Mechanic Area" />
     <main className="role-content">
@@ -141,9 +174,9 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
             const isDone = selectedStepIndex > index
             return <button key={step.label} disabled={savingStatus} className={`${isActive ? 'active' : isDone ? 'done' : ''} ${isActive && step.status === 'Ready' ? 'ready' : ''}`} onClick={() => changeSelectedStatus(step.status)}><span>{isDone ? <Check /> : index + 1}</span><small>{step.label}</small></button>
           })}</div>
-          <label className="notes-label">Comments / notes<textarea defaultValue="Vehicle is under evaluation. Add service notes here." /></label>
+          <label className="notes-label">Comments / notes<textarea value={updateNote} onChange={event => setUpdateNote(event.target.value)} placeholder={`Add a private update for ${selected.customer}'s ${selected.vehicle}...`} /></label>
           <div className="photo-strip"><button onClick={() => action('Camera ready to attach a photo.')}><Camera /><span>Add photo</span></button><span><Wrench /></span><span><Gauge /></span><span><Car /></span></div>
-          <div className="stacked-actions"><button className="primary-btn full" onClick={() => action('Update sent to the customer.')}><Send /> Send update</button><button className="secondary-btn full" onClick={() => setView('estimate')}><ReceiptText /> Send estimate</button><button className="secondary-btn full" onClick={() => setView('chat')}><MessageCircle /> Chat with customer</button><button className="secondary-btn danger-btn full" onClick={cancelSelectedOrder}>Cancel service</button></div>
+          <div className="stacked-actions"><button className="primary-btn full" disabled={savingUpdate} onClick={sendSelectedUpdate}><Send /> {savingUpdate ? 'Sending...' : 'Send update'}</button><button className="secondary-btn full" onClick={() => setView('estimate')}><ReceiptText /> Send estimate</button><button className="secondary-btn full" onClick={() => setView('chat')}><MessageCircle /> Chat with customer</button><button className="secondary-btn danger-btn full" onClick={cancelSelectedOrder}>Cancel service</button></div>
         </section> : <section className="role-panel service-detail"><div className="empty">Waiting for the first customer appointment.</div></section>}
       </div>
       </>}

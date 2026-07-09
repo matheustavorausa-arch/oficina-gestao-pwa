@@ -57,30 +57,34 @@ export function statusToDb(status: ServiceStatus): DbOrderStatus {
 }
 
 export async function updateServiceOrderStatus(profile: UserProfile, order: ServiceOrder, nextStatus: ServiceStatus) {
-  if (!supabase || !profile.workshopId) throw new Error('Supabase is not configured.')
+  return sendServiceOrderUpdate(order, nextStatus)
+}
 
-  const fromStatus = statusToDb(order.status)
-  const toStatus = statusToDb(nextStatus)
+export async function sendServiceOrderUpdate(order: ServiceOrder, status: ServiceStatus, note?: string) {
+  if (!supabase) throw new Error('Supabase is not configured.')
 
-  const { error: updateError } = await supabase
-    .from('service_orders')
-    .update({ status: toStatus })
-    .eq('id', order.id)
-    .eq('workshop_id', profile.workshopId)
+  const { error } = await supabase.rpc('send_service_order_update', {
+    p_service_order_id: order.id,
+    p_status: statusToDb(status),
+    p_note: note?.trim() || null,
+  })
 
-  if (updateError) throw updateError
+  if (error) throw error
+}
 
-  const { error: stageError } = await supabase
+export async function fetchLatestServiceOrderNote(orderId: string): Promise<string> {
+  if (!supabase) return ''
+
+  const { data, error } = await supabase
     .from('service_stage_events')
-    .insert({
-      workshop_id: profile.workshopId,
-      service_order_id: order.id,
-      from_status: fromStatus,
-      to_status: toStatus,
-      note: `Status changed to ${nextStatus}`,
-    })
+    .select('note')
+    .eq('service_order_id', orderId)
+    .not('note', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(8)
 
-  if (stageError) throw stageError
+  if (error) throw error
+  return (data ?? []).map(item => String(item.note ?? '').trim()).find(Boolean) ?? ''
 }
 
 export async function fetchServiceOrders(profile: UserProfile): Promise<ServiceOrder[]> {
