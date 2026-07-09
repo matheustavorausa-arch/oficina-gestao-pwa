@@ -264,3 +264,12 @@ table{font-size:12px}th{padding:15px 18px;background:#080d13;color:#778391}td{pa
     height:64px!important;
   }
 }
+
+/* Mechanic status progress */
+.status-steps button:disabled{cursor:wait;opacity:.72}
+.status-steps button.ready.active span{
+  background:#22c55e!important;
+  color:#fff!important;
+  box-shadow:0 0 0 4px rgba(34,197,94,.16)!important;
+}
+.status-steps button.ready.active:before{background:#ed111c!important}

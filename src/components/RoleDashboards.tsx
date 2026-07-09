@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, CalendarDays, Camera, Car, Check, ChevronRight, ClipboardCheck, Clock3, FileText, Gauge, History, Home, LogOut, MessageCircle, Plus, ReceiptText, Send, Settings2, UserRound, Wrench } from 'lucide-react'
 import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '../lib/avatars'
-import { fetchServiceOrders } from '../lib/serviceOrders'
+import { fetchServiceOrders, updateServiceOrderStatus } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
 import { workshopSchedulingConfig } from '../config/workshop'
 import { OTHER_VEHICLE_MAKE, OTHER_VEHICLE_MODEL, VEHICLES, VEHICLE_MAKE_OPTIONS, findVehicleModel, vehicleImageForText } from '../lib/vehicles'
@@ -10,7 +10,7 @@ import { deleteCustomerVehicle, fetchCustomerVehicles, saveCustomerVehicle, type
 import { fetchCustomerProfile, updateCustomerProfile, type CustomerProfileSettings } from '../lib/customerProfile'
 import { fetchOrderChatMessages, sendOrderChatMessage, uploadOrderChatPhoto, type OrderChatMessage } from '../lib/orderChat'
 import { decideEstimate, fetchLatestEstimate, sendRepairEstimate, type EstimateItemInput, type RepairEstimate } from '../lib/estimates'
-import type { ServiceOrder, UserProfile } from '../types'
+import type { ServiceOrder, ServiceStatus, UserProfile } from '../types'
 
 interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
 
@@ -28,20 +28,49 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
   const [remoteOrders, setRemoteOrders] = useState<ServiceOrder[]>([])
   const [selected, setSelected] = useState<ServiceOrder | null>(null)
   const [toast, setToast] = useState('')
-  const [status, setStatus] = useState('Evaluation')
+  const [savingStatus, setSavingStatus] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(defaultMechanicAvatar)
   const [view, setView] = useState<'services' | 'chat' | 'estimate'>('services')
   const tasks = remoteOrders.filter(order => order.status !== 'Completed' && order.status !== 'Cancelled')
+  const mechanicSteps: { label: string; status: ServiceStatus }[] = [
+    { label: 'Arrived', status: 'Waiting' },
+    { label: 'Evaluation', status: 'Diagnosis' },
+    { label: 'Waiting Approval', status: 'Estimate' },
+    { label: 'In Progress', status: 'In Progress' },
+    { label: 'Ready', status: 'Ready' },
+  ]
+  const selectedStepIndex = selected ? mechanicSteps.findIndex(step => step.status === selected.status) : -1
   function action(text: string) { setToast(text); setTimeout(() => setToast(''), 2300) }
+
+  async function refreshOrders(keepOrderId?: string) {
+    const items = await fetchServiceOrders(profile)
+    setRemoteOrders(items)
+    setSelected(current => items.find(item => item.id === (keepOrderId ?? current?.id)) ?? items.find(item => item.status !== 'Completed' && item.status !== 'Cancelled') ?? null)
+    return items
+  }
+
+  async function changeSelectedStatus(nextStatus: ServiceStatus) {
+    if (!selected || savingStatus || selected.status === nextStatus) return
+    setSavingStatus(true)
+    try {
+      await updateServiceOrderStatus(profile, selected, nextStatus)
+      setRemoteOrders(current => current.map(order => order.id === selected.id ? { ...order, status: nextStatus } : order))
+      setSelected(current => current ? { ...current, status: nextStatus } : current)
+      await refreshOrders(selected.id)
+      action(`Status saved: ${nextStatus}.`)
+    } catch (error) {
+      action(error instanceof Error ? error.message : 'Could not update service status.')
+    } finally {
+      setSavingStatus(false)
+    }
+  }
 
   async function cancelSelectedOrder() {
     if (!selected) return
     if (!confirm(`Cancel service ${selected.code} for ${selected.customer}?`)) return
     try {
       await cancelRepairOrder(selected.id, 'Cancelled by mechanic.')
-      const items = await fetchServiceOrders(profile)
-      setRemoteOrders(items)
-      setSelected(items.find(order => order.status !== 'Completed' && order.status !== 'Cancelled') ?? null)
+      await refreshOrders()
       action('Service cancelled. Owner and customer were notified.')
       setView('services')
     } catch (error) {
@@ -75,10 +104,7 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
 
   useEffect(() => {
     if (!supabase || !profile.workshopId) return
-    const loadOrders = () => fetchServiceOrders(profile).then(items => {
-      setRemoteOrders(items)
-      setSelected(current => items.find(item => item.id === current?.id && item.status !== 'Completed' && item.status !== 'Cancelled') ?? items.find(item => item.status !== 'Completed' && item.status !== 'Cancelled') ?? null)
-    }).catch(() => undefined)
+    const loadOrders = () => refreshOrders().catch(() => undefined)
     loadOrders()
     const client = supabase
     const channel = client
@@ -110,7 +136,11 @@ export function MechanicDashboard({ profile, onLogout }: Props) {
         <section className="role-panel task-list"><div className="role-panel-head"><div><h2>My schedule</h2><span>Services assigned to you</span></div><div className="tabs"><button className="active">Today</button><button>Completed</button></div></div>{tasks.map((order, index) => <button key={order.id} className={selected?.id === order.id ? 'task active' : 'task'} onClick={() => setSelected(order)}><time>{['08:30','10:00','11:30'][index] ?? '--:--'}</time><span className="task-car"><OrderVehicleImage order={order} className="task-car-image" /></span><p><strong>{order.vehicle}</strong><span>{order.customer} · {order.service}</span><small className={`tag tag-${index}`}>{order.status}</small></p><ChevronRight /></button>)}{tasks.length === 0 && <div className="empty">No assigned services yet.</div>}</section>
         {selected ? <section className="role-panel service-detail"><div className="service-hero"><div><span className="eyebrow">SERVICE IN PROGRESS</span><h2>{selected.vehicle}</h2><p>{selected.plate} · {selected.customer}</p></div><span className="big-car"><OrderVehicleImage order={selected} className="big-car-image" /></span></div>
           <div className="service-meta"><div><span>Service</span><strong>{selected.service}</strong></div><div><span>Order</span><strong>{selected.code}</strong></div><div><span>ETA</span><strong>Today, 5:30 PM</strong></div></div>
-          <div className="status-steps">{['Arrived','Evaluation','Waiting Approval','In Progress','Ready'].map((step, index) => <button key={step} className={status === step ? 'active' : index === 0 ? 'done' : ''} onClick={() => { setStatus(step); action(`Status updated: ${step}`) }}><span>{index === 0 ? <Check /> : index + 1}</span><small>{step}</small></button>)}</div>
+          <div className="status-steps">{mechanicSteps.map((step, index) => {
+            const isActive = selected.status === step.status
+            const isDone = selectedStepIndex > index
+            return <button key={step.label} disabled={savingStatus} className={`${isActive ? 'active' : isDone ? 'done' : ''} ${isActive && step.status === 'Ready' ? 'ready' : ''}`} onClick={() => changeSelectedStatus(step.status)}><span>{isDone ? <Check /> : index + 1}</span><small>{step.label}</small></button>
+          })}</div>
           <label className="notes-label">Comments / notes<textarea defaultValue="Vehicle is under evaluation. Add service notes here." /></label>
           <div className="photo-strip"><button onClick={() => action('Camera ready to attach a photo.')}><Camera /><span>Add photo</span></button><span><Wrench /></span><span><Gauge /></span><span><Car /></span></div>
           <div className="stacked-actions"><button className="primary-btn full" onClick={() => action('Update sent to the customer.')}><Send /> Send update</button><button className="secondary-btn full" onClick={() => setView('estimate')}><ReceiptText /> Send estimate</button><button className="secondary-btn full" onClick={() => setView('chat')}><MessageCircle /> Chat with customer</button><button className="secondary-btn danger-btn full" onClick={cancelSelectedOrder}>Cancel service</button></div>

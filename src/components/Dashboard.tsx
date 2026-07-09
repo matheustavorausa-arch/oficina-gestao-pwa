@@ -18,6 +18,7 @@ const statusClass: Record<ServiceStatus, string> = {
   Diagnosis: 'blue',
   Estimate: 'amber',
   'In Progress': 'green',
+  Ready: 'green',
   Completed: 'dark',
   Cancelled: 'gray',
 }

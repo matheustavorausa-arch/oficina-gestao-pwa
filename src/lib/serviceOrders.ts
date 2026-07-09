@@ -14,16 +14,28 @@ type DbOrder = {
   vehicles: { make: string; model: string; year: number | null; plate: string; vehicle_model_catalog?: { image_url: string | null; body_type: string | null } | null } | null
 }
 
+type DbOrderStatus = 'waiting' | 'diagnosis' | 'estimate' | 'approved' | 'in_progress' | 'quality_check' | 'completed' | 'delivered' | 'cancelled'
+
 const statusMap: Record<string, ServiceStatus> = {
   waiting: 'Waiting',
   diagnosis: 'Diagnosis',
   estimate: 'Estimate',
   approved: 'Estimate',
   in_progress: 'In Progress',
-  quality_check: 'In Progress',
+  quality_check: 'Ready',
   completed: 'Completed',
   delivered: 'Completed',
   cancelled: 'Cancelled',
+}
+
+const dbStatusMap: Record<ServiceStatus, DbOrderStatus> = {
+  Waiting: 'waiting',
+  Diagnosis: 'diagnosis',
+  Estimate: 'estimate',
+  'In Progress': 'in_progress',
+  Ready: 'quality_check',
+  Completed: 'completed',
+  Cancelled: 'cancelled',
 }
 
 function progressFor(status: string) {
@@ -33,11 +45,42 @@ function progressFor(status: string) {
     estimate: 42,
     approved: 55,
     in_progress: 72,
-    quality_check: 88,
+    quality_check: 92,
     completed: 100,
     delivered: 100,
     cancelled: 100,
   }[status] ?? 15
+}
+
+export function statusToDb(status: ServiceStatus): DbOrderStatus {
+  return dbStatusMap[status]
+}
+
+export async function updateServiceOrderStatus(profile: UserProfile, order: ServiceOrder, nextStatus: ServiceStatus) {
+  if (!supabase || !profile.workshopId) throw new Error('Supabase is not configured.')
+
+  const fromStatus = statusToDb(order.status)
+  const toStatus = statusToDb(nextStatus)
+
+  const { error: updateError } = await supabase
+    .from('service_orders')
+    .update({ status: toStatus })
+    .eq('id', order.id)
+    .eq('workshop_id', profile.workshopId)
+
+  if (updateError) throw updateError
+
+  const { error: stageError } = await supabase
+    .from('service_stage_events')
+    .insert({
+      workshop_id: profile.workshopId,
+      service_order_id: order.id,
+      from_status: fromStatus,
+      to_status: toStatus,
+      note: `Status changed to ${nextStatus}`,
+    })
+
+  if (stageError) throw stageError
 }
 
 export async function fetchServiceOrders(profile: UserProfile): Promise<ServiceOrder[]> {
