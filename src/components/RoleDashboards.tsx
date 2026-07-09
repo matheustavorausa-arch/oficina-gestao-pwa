@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Bell, CalendarDays, Camera, Car, Check, ChevronRight, ClipboardCheck, Clock3, FileText, Gauge, History, Home, LogOut, MessageCircle, Plus, ReceiptText, Send, Settings2, UserRound, Wrench } from 'lucide-react'
+import { CalendarDays, Camera, Car, Check, ChevronRight, ClipboardCheck, Clock3, FileText, Gauge, History, Home, LogOut, MessageCircle, Plus, ReceiptText, Send, Settings2, UserRound, Wrench } from 'lucide-react'
+import { NotificationsBell } from './NotificationsBell'
 import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '../lib/avatars'
 import { fetchLatestServiceOrderNote, fetchServiceOrders, sendServiceOrderUpdate, updateServiceOrderStatus } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
@@ -15,7 +16,7 @@ import type { ServiceOrder, ServiceStatus, UserProfile } from '../types'
 interface Props { profile: UserProfile; onLogout: () => void; onProfileChange?: (profile: UserProfile) => void }
 
 function RoleHeader({ profile, onLogout, title }: Props & { title: string }) {
-  return <header className="role-header"><div className="role-logo jas-brand"><span className="brand-mark"><Wrench /></span><div><strong><b>JAS</b> MOTORS</strong><small>{profile.workshopName}</small></div></div><span className="role-title">{title}</span><div className="role-head-actions"><button><Bell /><i /></button><button onClick={onLogout} title="Log out"><LogOut /></button></div></header>
+  return <header className="role-header"><div className="role-logo jas-brand"><span className="brand-mark"><Wrench /></span><div><strong><b>JAS</b> MOTORS</strong><small>{profile.workshopName}</small></div></div><span className="role-title">{title}</span><div className="role-head-actions"><NotificationsBell profile={profile} /><button onClick={onLogout} title="Log out"><LogOut /></button></div></header>
 }
 
 function Toast({ text }: { text: string }) { return text ? <div className="toast"><Check />{text}</div> : null }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, CalendarDays, Camera, Car, Check, ChevronRight, CircleDollarSign, ClipboardCheck, FileText, LayoutDashboard, Menu, MessageSquare, Settings, Users, Wrench, X } from 'lucide-react'
+import { CalendarDays, Camera, Car, Check, ChevronRight, CircleDollarSign, ClipboardCheck, FileText, LayoutDashboard, Menu, MessageSquare, Settings, Users, Wrench, X } from 'lucide-react'
+import { NotificationsBell } from './NotificationsBell'
 import { fetchServiceOrders } from '../lib/serviceOrders'
 import { supabase } from '../lib/supabase'
 import { defaultMechanicAvatar, resolveAvatarUrl, uploadProfileAvatar } from '../lib/avatars'
@@ -376,7 +377,7 @@ export function Dashboard({ profile, onLogout, onProfileChange }: Props) {
     </aside>
     {mobileMenu && <div className="sidebar-shade" onClick={() => setMobileMenu(false)} />}
     <main className="dashboard owner-dashboard">
-      <header className="owner-topbar"><button className="menu-btn" onClick={() => setMobileMenu(true)}><Menu /></button><div className="owner-title"><strong>Dashboard</strong><span>Shop overview</span></div><div className="owner-top-actions"><button className="icon-btn"><Bell /><i /></button><button className="icon-btn"><CalendarDays /></button><button className="owner-date"><CalendarDays />Today</button><button className="owner-user" onClick={() => setOwnerProfileOpen(true)}><span>{ownerName.split(' ').map(n => n[0]).join('').slice(0, 2)}</span><p><strong>{ownerName}</strong><small>Owner / Administrator</small></p><ChevronRight /></button></div></header>
+      <header className="owner-topbar"><button className="menu-btn" onClick={() => setMobileMenu(true)}><Menu /></button><div className="owner-title"><strong>Dashboard</strong><span>Shop overview</span></div><div className="owner-top-actions"><NotificationsBell profile={profile} /><button className="icon-btn"><CalendarDays /></button><button className="owner-date"><CalendarDays />Today</button><button className="owner-user" onClick={() => setOwnerProfileOpen(true)}><span>{ownerName.split(' ').map(n => n[0]).join('').slice(0, 2)}</span><p><strong>{ownerName}</strong><small>Owner / Administrator</small></p><ChevronRight /></button></div></header>
       <div className="content">
         <section className="owner-kpis">
           <article className="owner-kpi metric-clickable" onClick={() => setMetricModal('revenue')}><span className="kpi-icon kpi-green"><CircleDollarSign /></span><p>Today's Revenue<strong>{money(revenue)}</strong><small>Live data</small></p></article>
