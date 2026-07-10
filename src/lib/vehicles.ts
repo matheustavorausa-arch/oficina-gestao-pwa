@@ -214,21 +214,20 @@ export function findVehicleModel(make?: string, model?: string) {
 }
 
 export function vehicleSpecificImageForMakeModel(make?: string, model?: string) {
-  const cleanMake = make?.trim().toLowerCase()
-  const cleanModel = model?.trim().toLowerCase()
-  if (!cleanMake || !cleanModel) return undefined
-  return SPECIFIC_VEHICLE_IMAGES[`${cleanMake}|${cleanModel}`]
+  void make
+  void model
+  return undefined
 }
 
 export function vehicleImageForMakeModel(make?: string, model?: string) {
-  return vehicleSpecificImageForMakeModel(make, model) || vehicleImageForBodyType(findVehicleModel(make, model)?.bodyType)
+  void make
+  void model
+  return '/catalog/generic-car.svg'
 }
 
 export function vehicleImageForText(vehicleText?: string, bodyType?: string | null, preferredImage?: string | null) {
-  const text = vehicleText?.toLowerCase() ?? ''
-  const match = VEHICLES.find(vehicle => text.includes(vehicle.make.toLowerCase()) && text.includes(vehicle.model.toLowerCase()))
-  if (match) return vehicleImageForMakeModel(match.make, match.model)
-  if (preferredImage && !preferredImage.includes('/catalog/generic-car.svg')) return preferredImage
-  if (bodyType) return vehicleImageForBodyType(bodyType)
+  void vehicleText
+  void bodyType
+  void preferredImage
   return '/catalog/generic-car.svg'
 }
