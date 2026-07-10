@@ -487,3 +487,89 @@ table{font-size:12px}th{padding:15px 18px;background:#080d13;color:#778391}td{pa
     z-index:999!important;
   }
 }
+
+/* Notification icon alignment */
+.role-head-actions,
+.owner-top-actions{
+  align-items:center!important;
+}
+.role-head-actions .notification-trigger,
+.role-head-actions > button,
+.owner-top-actions .notification-trigger,
+.owner-top-actions > .icon-btn{
+  flex:0 0 42px!important;
+  width:42px!important;
+  height:42px!important;
+  min-width:42px!important;
+  min-height:42px!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  line-height:1!important;
+}
+.role-head-actions .notification-trigger > svg,
+.role-head-actions > button > svg,
+.owner-top-actions .notification-trigger > svg,
+.owner-top-actions > .icon-btn > svg{
+  width:20px!important;
+  height:20px!important;
+  display:block!important;
+  margin:0!important;
+}
+.notification-trigger b{
+  top:-6px!important;
+  right:-6px!important;
+  min-width:20px!important;
+  height:20px!important;
+  padding:0 5px!important;
+  display:grid!important;
+  place-items:center!important;
+  line-height:1!important;
+  font-size:10px!important;
+}
+.notification-trigger i{
+  display:none!important;
+}
+.notification-icon{
+  align-self:center!important;
+  width:40px!important;
+  height:40px!important;
+  min-width:40px!important;
+  display:grid!important;
+  place-items:center!important;
+  padding:0!important;
+}
+.notification-icon svg{
+  width:22px!important;
+  height:22px!important;
+  display:block!important;
+  margin:0!important;
+}
+.notification-item{
+  align-items:center!important;
+}
+.notification-item em{
+  align-self:center!important;
+  margin:0!important;
+}
+@media(max-width:760px){
+  .role-head-actions{gap:10px!important}
+  .role-head-actions .notification-trigger,
+  .role-head-actions > button{
+    flex-basis:52px!important;
+    width:52px!important;
+    height:52px!important;
+    min-width:52px!important;
+    min-height:52px!important;
+    border-radius:16px!important;
+  }
+  .role-head-actions .notification-trigger > svg,
+  .role-head-actions > button > svg{
+    width:24px!important;
+    height:24px!important;
+  }
+  .notification-trigger b{
+    top:-7px!important;
+    right:-7px!important;
+  }
+}
